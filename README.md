@@ -28,6 +28,9 @@ bash scripts/codex_task.sh --title "fix auth bug" --text "Login returns 500 for 
 ```
 
 `codex_task.sh` runs `scripts/codex_bootstrap.sh` first (if present), requires checklist `status: PASS`, then creates taskflow artifacts.
+Strict mode defaults are enabled:
+- `CODEX_TASKFLOW_REQUIRE_BOOTSTRAP=1`
+- `CODEX_BOOTSTRAP_REQUIRED=1`
 
 ## What it installs
 

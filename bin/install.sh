@@ -53,14 +53,20 @@ ensure_gitignore_block() {
   local gitignore_file="$TARGET/.gitignore"
   local start_marker="# >>> codex-taskflow-kit (local-only)"
   local end_marker="# <<< codex-taskflow-kit (local-only)"
+  local tmp_file
 
   if [[ ! -f "$gitignore_file" ]]; then
     touch "$gitignore_file"
   fi
 
   if grep -Fq "$start_marker" "$gitignore_file"; then
-    echo "[install] gitignore block exists: codex-taskflow-kit"
-    return
+    tmp_file="$(mktemp)"
+    awk -v start="$start_marker" -v end="$end_marker" '
+      $0 == start {inside=1; next}
+      $0 == end {inside=0; next}
+      !inside {print}
+    ' "$gitignore_file" > "$tmp_file"
+    mv "$tmp_file" "$gitignore_file"
   fi
 
   {
@@ -71,7 +77,7 @@ ensure_gitignore_block() {
     printf "%s\n" "$end_marker"
   } >> "$gitignore_file"
 
-  echo "[install] updated .gitignore with codex-taskflow-kit block"
+  echo "[install] synchronized .gitignore block: codex-taskflow-kit"
 }
 
 copy_file() {
