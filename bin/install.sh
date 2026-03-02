@@ -49,6 +49,31 @@ fi
 
 TARGET="$(cd "$TARGET" && pwd)"
 
+ensure_gitignore_block() {
+  local gitignore_file="$TARGET/.gitignore"
+  local start_marker="# >>> codex-taskflow-kit (local-only)"
+  local end_marker="# <<< codex-taskflow-kit (local-only)"
+
+  if [[ ! -f "$gitignore_file" ]]; then
+    touch "$gitignore_file"
+  fi
+
+  if grep -Fq "$start_marker" "$gitignore_file"; then
+    echo "[install] gitignore block exists: codex-taskflow-kit"
+    return
+  fi
+
+  {
+    printf "\n%s\n" "$start_marker"
+    printf "%s\n" ".codex_taskflow/"
+    printf "%s\n" "scripts/codex_task.sh"
+    printf "%s\n" "work/taskflow/"
+    printf "%s\n" "$end_marker"
+  } >> "$gitignore_file"
+
+  echo "[install] updated .gitignore with codex-taskflow-kit block"
+}
+
 copy_file() {
   local rel="$1"
   local src="$TEMPLATES_DIR/$rel"
@@ -85,6 +110,8 @@ FILES=(
 for rel in "${FILES[@]}"; do
   copy_file "$rel"
 done
+
+ensure_gitignore_block
 
 chmod +x \
   "$TARGET/scripts/codex_task.sh" \

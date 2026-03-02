@@ -55,3 +55,4 @@ bash bin/install.sh --target /path/to/repo
 ```
 
 Use `--force` to overwrite existing files.
+Installer also adds a managed local-only block to target `.gitignore` so taskflow files/artifacts are not tracked.
