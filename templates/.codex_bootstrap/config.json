@@ -1,0 +1,57 @@
+{
+  "project_name": "replace_with_project_name",
+  "required_skills": [
+    "branch-issue-review",
+    "gh-fix-ci"
+  ],
+  "startup_read_order": [
+    "scripts/codex_bootstrap.sh",
+    ".local_codex/CODEX_LOCAL_CHECKLIST.md",
+    "AGENTS.md",
+    ".local_codex/PROJECT_AGENT_STATE.json",
+    ".local_codex/PROJECT_NAVIGATION.md",
+    ".local_codex/PROJECT_DEPENDENCY_GRAPH.md",
+    ".local_codex/PROJECT_TREE.txt"
+  ],
+  "required_files": [
+    ".local_codex/AGENT_STATE.md",
+    ".local_codex/PROJECT_AGENT_STATE.json",
+    ".local_codex/PROJECT_TREE.txt",
+    ".local_codex/PROJECT_NAVIGATION.md",
+    ".local_codex/PROJECT_DEPENDENCY_GRAPH.md"
+  ],
+  "exclude_paths": [
+    ".git",
+    "node_modules",
+    "frontend/node_modules",
+    ".venv",
+    "frontend/.next",
+    "frontend/out",
+    "frontend/dist",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".cache"
+  ],
+  "entry_points": {
+    "backend_entry": "app/main.py",
+    "backend_router": "app/api/routers.py",
+    "worker_entry": "app/core/worker.py",
+    "frontend_layout": "frontend/app/layout.tsx",
+    "frontend_home": "frontend/app/page.tsx",
+    "frontend_api": "frontend/lib/api/client.ts"
+  },
+  "task_routing": {
+    "auth_api": [
+      "app/api/v1/auth.py",
+      "app/crud/user_crud.py",
+      "app/models/user.py"
+    ],
+    "strategy_api": [
+      "app/api/v1/strategy.py",
+      "app/crud/strategy_crud.py",
+      "app/models/strategy.py",
+      "app/shemas/strategy.py"
+    ]
+  }
+}
