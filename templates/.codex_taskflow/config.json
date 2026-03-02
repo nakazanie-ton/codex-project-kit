@@ -1,0 +1,45 @@
+{
+  "workflow_name": "codex-universal-taskflow",
+  "version": "1.0.0",
+  "out_dir": "work/taskflow",
+  "steps": [
+    {
+      "id": "intake",
+      "title": "Intake",
+      "goal": "Capture task intent and observable symptoms"
+    },
+    {
+      "id": "scope",
+      "title": "Scope",
+      "goal": "Define boundaries, constraints, and impact area"
+    },
+    {
+      "id": "plan",
+      "title": "Plan",
+      "goal": "Create minimal executable sequence with checkpoints"
+    },
+    {
+      "id": "execute",
+      "title": "Execute",
+      "goal": "Implement changes and record decisions"
+    },
+    {
+      "id": "verify",
+      "title": "Verify",
+      "goal": "Validate behavior and regressions"
+    },
+    {
+      "id": "handoff",
+      "title": "Handoff",
+      "goal": "Summarize outcomes, residual risks, and next steps"
+    }
+  ],
+  "artifacts": {
+    "intake": "00_intake.md",
+    "scope": "10_scope.md",
+    "plan": "20_plan.md",
+    "execute": "30_execution_log.md",
+    "verify": "40_verification.md",
+    "handoff": "50_handoff.md"
+  }
+}
