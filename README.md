@@ -23,6 +23,7 @@ bash bin/install.sh --target /path/to/repo
 ```
 
 Use `--force` to overwrite existing files.
+Installer also adds a managed local-only block to target `.gitignore` so bootstrap files are not tracked.
 
 ## First Run In Target Repo
 
