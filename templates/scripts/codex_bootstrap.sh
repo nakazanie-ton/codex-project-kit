@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CORE="$ROOT_DIR/.codex_bootstrap/bootstrap/codex_bootstrap_core.sh"
-STRICT="${CODEX_BOOTSTRAP_REQUIRED:-0}"
+STRICT="${CODEX_BOOTSTRAP_REQUIRED:-1}"
 
 if [[ -x "$CORE" ]]; then
   "$CORE"

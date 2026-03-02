@@ -57,14 +57,20 @@ ensure_gitignore_block() {
   local gitignore_file="$TARGET/.gitignore"
   local start_marker="# >>> codex-bootstrap-kit (local-only)"
   local end_marker="# <<< codex-bootstrap-kit (local-only)"
+  local tmp_file
 
   if [[ ! -f "$gitignore_file" ]]; then
     touch "$gitignore_file"
   fi
 
   if grep -Fq "$start_marker" "$gitignore_file"; then
-    echo "[install] gitignore block exists: codex-bootstrap-kit"
-    return
+    tmp_file="$(mktemp)"
+    awk -v start="$start_marker" -v end="$end_marker" '
+      $0 == start {inside=1; next}
+      $0 == end {inside=0; next}
+      !inside {print}
+    ' "$gitignore_file" > "$tmp_file"
+    mv "$tmp_file" "$gitignore_file"
   fi
 
   {
@@ -74,12 +80,13 @@ ensure_gitignore_block() {
     printf "%s\n" ".githooks/pre-commit"
     printf "%s\n" "scripts/codex_bootstrap.sh"
     printf "%s\n" "scripts/codex_session.sh"
+    printf "%s\n" "scripts/codex_verify_session.sh"
     printf "%s\n" "scripts/git_pre_commit_sync.sh"
     printf "%s\n" "scripts/install_git_hooks.sh"
     printf "%s\n" "$end_marker"
   } >> "$gitignore_file"
 
-  echo "[install] updated .gitignore with codex-bootstrap-kit block"
+  echo "[install] synchronized .gitignore block: codex-bootstrap-kit"
 }
 
 copy_file() {
@@ -106,6 +113,7 @@ copy_file() {
 FILES=(
   "scripts/codex_bootstrap.sh"
   "scripts/codex_session.sh"
+  "scripts/codex_verify_session.sh"
   "scripts/git_pre_commit_sync.sh"
   "scripts/install_git_hooks.sh"
   ".githooks/pre-commit"
@@ -124,6 +132,7 @@ ensure_gitignore_block
 chmod +x \
   "$TARGET/scripts/codex_bootstrap.sh" \
   "$TARGET/scripts/codex_session.sh" \
+  "$TARGET/scripts/codex_verify_session.sh" \
   "$TARGET/scripts/git_pre_commit_sync.sh" \
   "$TARGET/scripts/install_git_hooks.sh" \
   "$TARGET/.githooks/pre-commit" \

@@ -8,6 +8,7 @@ This repository extracts the full "start Codex session -> generate local context
 
 - `scripts/codex_bootstrap.sh`
 - `scripts/codex_session.sh`
+- `scripts/codex_verify_session.sh`
 - `scripts/git_pre_commit_sync.sh`
 - `scripts/install_git_hooks.sh`
 - `.githooks/pre-commit`
@@ -24,12 +25,14 @@ bash bin/install.sh --target /path/to/repo
 
 Use `--force` to overwrite existing files.
 Installer also adds a managed local-only block to target `.gitignore` so bootstrap files are not tracked.
+Strict mode is enabled by default (`CODEX_BOOTSTRAP_REQUIRED=1` unless explicitly overridden).
 
 ## First Run In Target Repo
 
 ```bash
 bash scripts/codex_bootstrap.sh
 cat .local_codex/CODEX_LOCAL_CHECKLIST.md
+bash scripts/codex_verify_session.sh
 ```
 
 When checklist shows `status: PASS`, the repo is ready for Codex work.

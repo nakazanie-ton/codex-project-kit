@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export CODEX_BOOTSTRAP_REQUIRED="${CODEX_BOOTSTRAP_REQUIRED:-1}"
 
 if (( $# > 0 )); then
   # Explicit command was passed by caller (for example: acodex -> codex_session.sh codex ...)

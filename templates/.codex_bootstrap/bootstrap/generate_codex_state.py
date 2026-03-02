@@ -375,7 +375,7 @@ def build_state_json(
         },
         "required_skills": config.required_skills,
         "tooling": {
-            "bootstrap_mode": "soft_default",
+            "bootstrap_mode": "strict_default",
             "bootstrap_strict_env": "CODEX_BOOTSTRAP_REQUIRED=1",
             "session_command_env": "CODEX_SESSION_CMD",
         },
