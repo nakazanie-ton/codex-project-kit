@@ -152,6 +152,53 @@ EOF
   assert_grep 'dry-run: skipped strict verification' "$dry_run_repo/dry-run.log" "dry-run output missing verification skip message"
 }
 
+run_config_validation_checks() {
+  log "Running config validation checks"
+
+  local validation_repo bootstrap_status taskflow_status
+  validation_repo="$(mktemp -d /tmp/codex-config-validation-test.XXXXXX)"
+  TMP_PATHS+=("$validation_repo")
+  git -C "$validation_repo" init -q
+
+  bash "$ROOT_DIR/scripts/one_click_install.sh" "$validation_repo" >/dev/null
+
+  cat >"$validation_repo/.codex_bootstrap/config.json" <<'EOF'
+{
+  "startup_read_order": "not-a-list"
+}
+EOF
+  set +e
+  (
+    cd "$validation_repo"
+    bash scripts/codex_bootstrap.sh >"$validation_repo/bootstrap-invalid.out" 2>"$validation_repo/bootstrap-invalid.err"
+  )
+  bootstrap_status=$?
+  set -e
+  [[ "$bootstrap_status" -ne 0 ]] || fail "invalid bootstrap config unexpectedly passed"
+  assert_grep "startup_read_order' must be a list of strings" "$validation_repo/bootstrap-invalid.err" "bootstrap config validation message missing"
+
+  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" "$validation_repo" >/dev/null
+
+  cat >"$validation_repo/.codex_taskflow/config.json" <<'EOF'
+{
+  "workflow_name": "bad-taskflow",
+  "version": "1.0.0",
+  "out_dir": "work/taskflow",
+  "steps": [],
+  "artifacts": {}
+}
+EOF
+  set +e
+  (
+    cd "$validation_repo"
+    bash scripts/codex_task.sh --title "Invalid taskflow config" --text "must fail" >"$validation_repo/taskflow-invalid.out" 2>"$validation_repo/taskflow-invalid.err"
+  )
+  taskflow_status=$?
+  set -e
+  [[ "$taskflow_status" -ne 0 ]] || fail "invalid taskflow config unexpectedly passed"
+  assert_grep "missing required step id" "$validation_repo/taskflow-invalid.err" "taskflow config validation message missing"
+}
+
 run_surface_smoke_checks() {
   log "Running surface smoke checks (CLI / Codex App / Agent Skills)"
 
@@ -234,6 +281,7 @@ main() {
   run_syntax_gates
   run_gitignore_resilience_checks
   run_non_destructive_mode_checks
+  run_config_validation_checks
   run_surface_smoke_checks
   run_docs_surface_checks
   log "All checks passed"

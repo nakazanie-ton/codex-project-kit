@@ -72,6 +72,44 @@ def normalize_rel_path(path: str) -> str:
     return normalized.strip("/")
 
 
+def require_list_of_strings(value: Any, field: str) -> list[str]:
+    if not isinstance(value, list):
+        raise SystemExit(f"Invalid config: '{field}' must be a list of strings")
+
+    result: list[str] = []
+    for idx, item in enumerate(value):
+        if not isinstance(item, str):
+            raise SystemExit(f"Invalid config: '{field}[{idx}]' must be a string")
+        stripped = item.strip()
+        if stripped:
+            result.append(stripped)
+    return result
+
+
+def require_dict_of_strings(value: Any, field: str) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise SystemExit(f"Invalid config: '{field}' must be an object with string values")
+
+    result: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(item, str):
+            raise SystemExit(f"Invalid config: '{field}.{key}' must be a string")
+        stripped = item.strip()
+        if stripped:
+            result[str(key)] = stripped
+    return result
+
+
+def require_task_routing(value: Any, field: str) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        raise SystemExit(f"Invalid config: '{field}' must be an object of string arrays")
+
+    result: dict[str, list[str]] = {}
+    for key, items in value.items():
+        result[str(key)] = require_list_of_strings(items, f"{field}.{key}")
+    return result
+
+
 def load_config(root: Path, config_path: Path) -> BootstrapConfig:
     raw: dict[str, Any] = {}
     if config_path.exists():
@@ -82,34 +120,25 @@ def load_config(root: Path, config_path: Path) -> BootstrapConfig:
 
     project_name = str(raw.get("project_name") or root.name)
 
-    required_skills = [str(x) for x in raw.get("required_skills", []) if str(x).strip()]
+    required_skills = require_list_of_strings(raw.get("required_skills", []), "required_skills")
 
-    startup_read_order = [str(x) for x in raw.get("startup_read_order", DEFAULT_STARTUP_ORDER)]
+    startup_read_order = require_list_of_strings(
+        raw.get("startup_read_order", DEFAULT_STARTUP_ORDER),
+        "startup_read_order",
+    )
     if not startup_read_order:
         startup_read_order = DEFAULT_STARTUP_ORDER.copy()
 
-    required_files = [str(x) for x in raw.get("required_files", DEFAULT_REQUIRED_FILES)]
+    required_files = require_list_of_strings(raw.get("required_files", DEFAULT_REQUIRED_FILES), "required_files")
     if not required_files:
         required_files = DEFAULT_REQUIRED_FILES.copy()
 
-    exclude_paths_raw = raw.get("exclude_paths", [])
+    exclude_paths_raw = require_list_of_strings(raw.get("exclude_paths", []), "exclude_paths")
     exclude_paths = set(DEFAULT_EXCLUDE_PATHS)
     exclude_paths.update(normalize_rel_path(str(x)) for x in exclude_paths_raw)
 
-    entry_points_raw = raw.get("entry_points", {})
-    entry_points: dict[str, str] = {}
-    if isinstance(entry_points_raw, dict):
-        for key, value in entry_points_raw.items():
-            if str(value).strip():
-                entry_points[str(key)] = str(value).strip()
-
-    task_routing_raw = raw.get("task_routing", {})
-    task_routing: dict[str, list[str]] = {}
-    if isinstance(task_routing_raw, dict):
-        for route, files in task_routing_raw.items():
-            if isinstance(files, list):
-                normalized = [str(item).strip() for item in files if str(item).strip()]
-                task_routing[str(route)] = normalized
+    entry_points = require_dict_of_strings(raw.get("entry_points", {}), "entry_points")
+    task_routing = require_task_routing(raw.get("task_routing", {}), "task_routing")
 
     return BootstrapConfig(
         project_name=project_name,
@@ -378,7 +407,7 @@ def build_state_json(
         "tooling": {
             "bootstrap_mode": "strict_default",
             "bootstrap_strict_env": "CODEX_BOOTSTRAP_REQUIRED=1",
-            "session_command_env": "CODEX_SESSION_CMD",
+            "session_command_env": "CODEX_SESSION_SH (preferred), CODEX_SESSION_CMD",
         },
     }
 

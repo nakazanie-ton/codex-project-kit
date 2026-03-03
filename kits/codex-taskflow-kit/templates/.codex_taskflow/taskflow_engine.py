@@ -11,6 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+REQUIRED_STEP_IDS = ["intake", "scope", "plan", "execute", "verify", "handoff"]
+REQUIRED_ARTIFACT_KEYS = ["intake", "scope", "plan", "execute", "verify", "handoff"]
+
 
 def now_utc() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -36,13 +39,73 @@ def read_task_text(args: argparse.Namespace) -> str:
     return ""
 
 
+def require_nonempty_string(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise SystemExit(f"Invalid config: '{field}' must be a non-empty string")
+    return value.strip()
+
+
+def validate_steps(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        raise SystemExit("Invalid config: 'steps' must be a list of objects")
+
+    steps: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+    for idx, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise SystemExit(f"Invalid config: 'steps[{idx}]' must be an object")
+
+        step_id = require_nonempty_string(item.get("id"), f"steps[{idx}].id")
+        title = require_nonempty_string(item.get("title"), f"steps[{idx}].title")
+        goal = require_nonempty_string(item.get("goal"), f"steps[{idx}].goal")
+        seen_ids.add(step_id)
+        steps.append({"id": step_id, "title": title, "goal": goal})
+
+    missing = [step_id for step_id in REQUIRED_STEP_IDS if step_id not in seen_ids]
+    if missing:
+        raise SystemExit("Invalid config: missing required step id(s): " + ", ".join(missing))
+    return steps
+
+
+def validate_artifacts(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise SystemExit("Invalid config: 'artifacts' must be an object")
+
+    artifacts: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(item, str) or not item.strip():
+            raise SystemExit(f"Invalid config: 'artifacts.{key}' must be a non-empty string")
+        artifacts[str(key)] = item.strip()
+
+    missing = [key for key in REQUIRED_ARTIFACT_KEYS if key not in artifacts]
+    if missing:
+        raise SystemExit("Invalid config: missing required artifact key(s): " + ", ".join(missing))
+    return artifacts
+
+
 def load_config(config_path: Path) -> dict[str, Any]:
     if not config_path.exists():
         raise SystemExit(f"Config not found: {config_path}")
     try:
-        return json.loads(config_path.read_text(encoding="utf-8"))
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise SystemExit(f"Invalid JSON config {config_path}: {exc}") from exc
+
+    if not isinstance(raw, dict):
+        raise SystemExit("Invalid config: root JSON value must be an object")
+
+    config: dict[str, Any] = dict(raw)
+
+    if "workflow_name" in config:
+        config["workflow_name"] = require_nonempty_string(config["workflow_name"], "workflow_name")
+    if "version" in config:
+        config["version"] = require_nonempty_string(config["version"], "version")
+    if "out_dir" in config:
+        config["out_dir"] = require_nonempty_string(config["out_dir"], "out_dir")
+
+    config["steps"] = validate_steps(config.get("steps", []))
+    config["artifacts"] = validate_artifacts(config.get("artifacts", {}))
+    return config
 
 
 def checklist_status(root: Path) -> str:
