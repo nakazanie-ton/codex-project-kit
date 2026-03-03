@@ -212,6 +212,7 @@ run_surface_smoke_checks() {
   assert_file "$target_repo/scripts/codex_session.sh"
   assert_file "$target_repo/scripts/codex_verify_session.sh"
   assert_file "$target_repo/scripts/codex_task.sh"
+  assert_file "$target_repo/scripts/codex_task_lint.sh"
 
   # Bootstrap output control surface.
   (
@@ -250,6 +251,22 @@ EOF
   )"
   task_json="$(echo "$task_json" | tr -d '\r')"
   assert_file "$task_json"
+
+  (
+    cd "$target_repo"
+    bash scripts/codex_task_lint.sh --latest --mode scaffold >"$target_repo/taskflow-lint-scaffold.out"
+  )
+  assert_grep 'PASS mode=scaffold' "$target_repo/taskflow-lint-scaffold.out" "taskflow scaffold lint did not pass"
+
+  set +e
+  (
+    cd "$target_repo"
+    bash scripts/codex_task_lint.sh --latest --mode complete >"$target_repo/taskflow-lint-complete.out" 2>"$target_repo/taskflow-lint-complete.err"
+  )
+  local lint_complete_status=$?
+  set -e
+  [[ "$lint_complete_status" -ne 0 ]] || fail "taskflow complete lint unexpectedly passed on scaffold artifacts"
+  assert_grep 'placeholder-style content remains in complete mode' "$target_repo/taskflow-lint-complete.err" "taskflow complete lint missing expected failure signal"
 
   # Agent Skills surface: AGENTS startup contract + generated startup order + PASS checklist.
   cat >"$target_repo/AGENTS.md" <<'EOF'

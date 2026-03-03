@@ -41,6 +41,7 @@ Coverage includes:
 - syntax checks for shell/python sources
 - installer `.gitignore` resilience and idempotency
 - config validation failure checks for bootstrap/taskflow JSON
+- taskflow lint checks (`scaffold` pass, `complete` fail-on-placeholders)
 - CLI applicability (`codex_session.sh`)
 - Codex App applicability (`codex_verify_session.sh`, `codex_task.sh`)
 - AGENTS/Skills applicability (startup contract and checklist state)

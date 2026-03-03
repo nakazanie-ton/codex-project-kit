@@ -35,6 +35,7 @@ Strict mode defaults are enabled:
 ## What it installs
 
 - `scripts/codex_task.sh`
+- `scripts/codex_task_lint.sh`
 - `.codex_taskflow/config.json`
 - `.codex_taskflow/taskflow_engine.py`
 - `.codex_taskflow/templates/*.md`
@@ -50,6 +51,13 @@ Each task creates:
 - `work/taskflow/<task_id>/40_verification.md`
 - `work/taskflow/<task_id>/50_handoff.md`
 - `work/taskflow/<task_id>/taskflow.json`
+
+Lint helper:
+
+```bash
+bash scripts/codex_task_lint.sh --latest --mode scaffold
+bash scripts/codex_task_lint.sh --latest --mode complete
+```
 
 ## Install Into Any Repo
 
