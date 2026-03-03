@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_PATHS=()
+VALIDATE_JSON_SCRIPT="$ROOT_DIR/scripts/validate_json.sh"
 
 log() {
   echo "[test-kits] $1"
@@ -48,8 +49,8 @@ assert_line_count() {
   [[ "$actual" == "$expected" ]] || fail "$message (expected=$expected actual=$actual file=$file)"
 }
 
-run_syntax_gates() {
-  log "Running syntax gates"
+run_shell_and_json_gates() {
+  log "Running shell and JSON gates"
 
   local shell_files=()
   while IFS= read -r file; do
@@ -57,6 +58,46 @@ run_syntax_gates() {
   done < <(find "$ROOT_DIR/kits" "$ROOT_DIR/scripts" -type f \( -name "*.sh" -o -path "*/.githooks/pre-commit" \) | sort)
   [[ "${#shell_files[@]}" -gt 0 ]] || fail "no shell files discovered"
   bash -n "${shell_files[@]}"
+
+  if command -v shellcheck >/dev/null 2>&1; then
+    shellcheck -x "${shell_files[@]}"
+  else
+    log "shellcheck not found; skipping shellcheck gate"
+  fi
+
+  bash "$VALIDATE_JSON_SCRIPT" \
+    --file "$ROOT_DIR/kits/codex-bootstrap-kit/templates/.codex_bootstrap/config.json" \
+    --required project_name \
+    --required required_skills \
+    --required startup_read_order \
+    --required required_files \
+    --required exclude_paths \
+    --required entry_points \
+    --required task_routing \
+    --type project_name:string \
+    --type required_skills:array \
+    --type startup_read_order:array \
+    --type required_files:array \
+    --type exclude_paths:array \
+    --type entry_points:object \
+    --type task_routing:object
+
+  bash "$VALIDATE_JSON_SCRIPT" \
+    --file "$ROOT_DIR/kits/codex-taskflow-kit/templates/.codex_taskflow/config.json" \
+    --required workflow_name \
+    --required version \
+    --required out_dir \
+    --required steps \
+    --required artifacts \
+    --type workflow_name:string \
+    --type version:string \
+    --type out_dir:string \
+    --type steps:array \
+    --type artifacts:object
+}
+
+run_python_compile_gates() {
+  log "Running python compile gates"
 
   local py_files=()
   while IFS= read -r file; do
@@ -137,7 +178,7 @@ EOF
   assert_grep '^echo ORIGINAL_SESSION$' "$backup_file_path" "backup file does not contain original script content"
 
   sleep 1
-  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" "$backup_repo" --backup >/dev/null
+  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" --target "$backup_repo" --backup >/dev/null
   assert_grep '"project_name":[[:space:]]*""' "$backup_repo/.codex_bootstrap/config.json" "normalize script did not rewrite config"
   config_backup_count="$(find "$backup_repo/.codex_install_backups/codex-bootstrap-kit" -type f -path '*/.codex_bootstrap/config.json' | wc -l | tr -d ' ')"
   if [[ "$config_backup_count" -lt 2 ]]; then
@@ -145,7 +186,7 @@ EOF
   fi
 
   git -C "$dry_run_repo" init -q
-  bash "$ROOT_DIR/scripts/one_click_install.sh" "$dry_run_repo" --dry-run >"$dry_run_repo/dry-run.log"
+  bash "$ROOT_DIR/scripts/one_click_install.sh" --target "$dry_run_repo" --dry-run >"$dry_run_repo/dry-run.log"
   if [[ -e "$dry_run_repo/scripts/codex_bootstrap.sh" ]]; then
     fail "one_click_install --dry-run unexpectedly wrote files"
   fi
@@ -155,12 +196,34 @@ EOF
 run_config_validation_checks() {
   log "Running config validation checks"
 
-  local validation_repo bootstrap_status taskflow_status
+  local validation_repo bootstrap_json_status bootstrap_required_status bootstrap_status taskflow_json_status taskflow_status
   validation_repo="$(mktemp -d /tmp/codex-config-validation-test.XXXXXX)"
   TMP_PATHS+=("$validation_repo")
   git -C "$validation_repo" init -q
 
-  bash "$ROOT_DIR/scripts/one_click_install.sh" "$validation_repo" >/dev/null
+  bash "$ROOT_DIR/scripts/one_click_install.sh" --target "$validation_repo" >/dev/null
+
+  cat >"$validation_repo/.codex_bootstrap/config.json" <<'EOF'
+{
+EOF
+  set +e
+  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" --target "$validation_repo" --check >"$validation_repo/bootstrap-check-invalid-json.out" 2>"$validation_repo/bootstrap-check-invalid-json.err"
+  bootstrap_json_status=$?
+  set -e
+  [[ "$bootstrap_json_status" -ne 0 ]] || fail "bootstrap --check unexpectedly passed invalid JSON"
+  assert_grep 'invalid JSON' "$validation_repo/bootstrap-check-invalid-json.err" "bootstrap invalid JSON message missing"
+
+  cat >"$validation_repo/.codex_bootstrap/config.json" <<'EOF'
+{
+  "project_name": ""
+}
+EOF
+  set +e
+  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" --target "$validation_repo" --check >"$validation_repo/bootstrap-check-required.out" 2>"$validation_repo/bootstrap-check-required.err"
+  bootstrap_required_status=$?
+  set -e
+  [[ "$bootstrap_required_status" -ne 0 ]] || fail "bootstrap --check unexpectedly passed missing required fields"
+  assert_grep "missing required field: 'required_skills'" "$validation_repo/bootstrap-check-required.err" "bootstrap missing-required message missing"
 
   cat >"$validation_repo/.codex_bootstrap/config.json" <<'EOF'
 {
@@ -175,9 +238,22 @@ EOF
   bootstrap_status=$?
   set -e
   [[ "$bootstrap_status" -ne 0 ]] || fail "invalid bootstrap config unexpectedly passed"
-  assert_grep "startup_read_order' must be a list of strings" "$validation_repo/bootstrap-invalid.err" "bootstrap config validation message missing"
+  assert_grep "startup_read_order' must be a list of strings|expected array" "$validation_repo/bootstrap-invalid.err" "bootstrap config validation message missing"
 
-  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" "$validation_repo" >/dev/null
+  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" --target "$validation_repo" >/dev/null
+
+  cat >"$validation_repo/.codex_taskflow/config.json" <<'EOF'
+{
+EOF
+  set +e
+  (
+    cd "$validation_repo"
+    bash scripts/codex_task.sh --title "Invalid taskflow json" --text "must fail" >"$validation_repo/taskflow-invalid-json.out" 2>"$validation_repo/taskflow-invalid-json.err"
+  )
+  taskflow_json_status=$?
+  set -e
+  [[ "$taskflow_json_status" -ne 0 ]] || fail "invalid taskflow JSON unexpectedly passed"
+  assert_grep "Invalid JSON config .*\\.codex_taskflow/config\\.json" "$validation_repo/taskflow-invalid-json.err" "taskflow invalid JSON message missing"
 
   cat >"$validation_repo/.codex_taskflow/config.json" <<'EOF'
 {
@@ -196,7 +272,7 @@ EOF
   taskflow_status=$?
   set -e
   [[ "$taskflow_status" -ne 0 ]] || fail "invalid taskflow config unexpectedly passed"
-  assert_grep "missing required step id" "$validation_repo/taskflow-invalid.err" "taskflow config validation message missing"
+  assert_grep "missing required step id\\(s\\)|missing required artifact key\\(s\\)" "$validation_repo/taskflow-invalid.err" "taskflow config validation message missing"
 }
 
 run_surface_smoke_checks() {
@@ -207,7 +283,7 @@ run_surface_smoke_checks() {
   TMP_PATHS+=("$target_repo")
   git -C "$target_repo" init -q
 
-  bash "$ROOT_DIR/scripts/one_click_install.sh" "$target_repo" >"$target_repo/install.log"
+  bash "$ROOT_DIR/scripts/one_click_install.sh" --target "$target_repo" >"$target_repo/install.log"
 
   assert_file "$target_repo/scripts/codex_session.sh"
   assert_file "$target_repo/scripts/codex_verify_session.sh"
@@ -336,10 +412,14 @@ run_docs_surface_checks() {
   assert_grep '^- Codex CLI$' "$ROOT_DIR/README.md" "README missing Codex CLI surface"
   assert_grep '^- Codex App$' "$ROOT_DIR/README.md" "README missing Codex App surface"
   assert_grep '^- AGENTS/Skills flow$' "$ROOT_DIR/README.md" "README missing AGENTS/Skills surface"
+  assert_grep 'scripts/one_click_install\.sh --target /absolute/path/to/target-repo' "$ROOT_DIR/README.md" "README missing --target usage for one_click_install"
+  assert_grep '\[LICENSE\]\(LICENSE\)' "$ROOT_DIR/README.md" "README missing LICENSE link"
+  assert_grep '\[SECURITY\.md\]\(SECURITY\.md\)' "$ROOT_DIR/README.md" "README missing SECURITY link"
 }
 
 main() {
-  run_syntax_gates
+  run_shell_and_json_gates
+  run_python_compile_gates
   run_gitignore_resilience_checks
   run_non_destructive_mode_checks
   run_config_validation_checks

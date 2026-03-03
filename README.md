@@ -2,6 +2,10 @@
 
 Codex project bootstrap + taskflow kit in one package.
 
+Legal and security:
+- [LICENSE](LICENSE)
+- [SECURITY.md](SECURITY.md)
+
 This repo is designed to work across three integration surfaces:
 - Codex CLI
 - Codex App
@@ -57,7 +61,7 @@ When it is not better:
 
 ## One-click installer (for existing repositories)
 ```bash
-bash scripts/one_click_install.sh /absolute/path/to/target-repo
+bash scripts/one_click_install.sh --target /absolute/path/to/target-repo
 ```
 
 Optional flags:

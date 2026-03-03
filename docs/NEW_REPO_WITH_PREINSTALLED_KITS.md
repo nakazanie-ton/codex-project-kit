@@ -10,7 +10,7 @@ Use this runbook when your repository already contains installed kit artifacts:
 If `.codex_bootstrap/config.json` contains framework-specific defaults, normalize it from this repo:
 
 ```bash
-bash scripts/normalize_bootstrap_config.sh /absolute/path/to/target-repo
+bash scripts/normalize_bootstrap_config.sh --target /absolute/path/to/target-repo
 ```
 
 Optional safety flags:

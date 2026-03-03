@@ -17,5 +17,10 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
       - name: Run kit validation
         run: bash scripts/test_kits.sh

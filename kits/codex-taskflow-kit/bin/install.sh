@@ -6,6 +6,7 @@ KIT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATES_DIR="$KIT_ROOT/templates"
 
 TARGET=""
+TARGET_SET=0
 FORCE=0
 DRY_RUN=0
 BACKUP=0
@@ -25,11 +26,22 @@ Options:
 USAGE
 }
 
+fail() {
+  echo "[install] ERROR: $1" >&2
+  exit 1
+}
+
 while (( $# > 0 )); do
   case "$1" in
     --target)
-      shift
-      TARGET="${1:-}"
+      if [[ "$TARGET_SET" -eq 1 ]]; then
+        fail "--target was provided more than once"
+      fi
+      shift || true
+      [[ $# -gt 0 ]] || fail "--target requires a value"
+      [[ "${1:-}" != --* ]] || fail "--target requires a path value"
+      TARGET="$1"
+      TARGET_SET=1
       ;;
     --force)
       FORCE=1
@@ -45,20 +57,17 @@ while (( $# > 0 )); do
       exit 0
       ;;
     *)
-      echo "[install] Unknown argument: $1" >&2
-      usage
-      exit 1
+      fail "unknown argument: $1"
       ;;
   esac
   shift || true
 done
 
-if [[ -z "$TARGET" ]]; then
-  echo "[install] --target is required" >&2
-  usage
-  exit 1
+if [[ "$TARGET_SET" -ne 1 ]]; then
+  fail "--target is required"
 fi
 
+[[ -d "$TARGET" ]] || fail "target directory not found: $TARGET"
 TARGET="$(cd "$TARGET" && pwd)"
 
 backup_file() {

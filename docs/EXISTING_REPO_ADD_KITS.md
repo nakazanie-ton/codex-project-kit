@@ -6,7 +6,7 @@ Use this runbook when a repository does not yet have bootstrap/taskflow kits.
 From the `codex-project-kit` root, run:
 
 ```bash
-bash scripts/one_click_install.sh /absolute/path/to/target-repo
+bash scripts/one_click_install.sh --target /absolute/path/to/target-repo
 ```
 
 Optional safety flags:
