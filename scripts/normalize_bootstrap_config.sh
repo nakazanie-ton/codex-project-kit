@@ -135,7 +135,7 @@ if [[ "$BACKUP" -eq 1 ]]; then
   BACKUP_PATH="$TARGET/.codex_install_backups/codex-bootstrap-kit/$BACKUP_STAMP/.codex_bootstrap/config.json"
   mkdir -p "$(dirname "$BACKUP_PATH")"
   cp "$CONFIG_PATH" "$BACKUP_PATH"
-  echo "[orchestrator] backup: .codex_bootstrap/config.json -> ${BACKUP_PATH#$TARGET/}"
+  echo "[orchestrator] backup: .codex_bootstrap/config.json -> ${BACKUP_PATH#"$TARGET"/}"
 fi
 
 cat >"$CONFIG_PATH" <<'JSON'

@@ -90,7 +90,7 @@ backup_file() {
   backup_path="$BACKUP_ROOT/$clean_rel"
   mkdir -p "$(dirname "$backup_path")"
   cp "$src" "$backup_path"
-  echo "[install] backup: $clean_rel -> ${backup_path#$TARGET/}"
+  echo "[install] backup: $clean_rel -> ${backup_path#"$TARGET"/}"
 }
 
 ensure_gitignore_block() {
