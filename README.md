@@ -62,17 +62,22 @@ When it is not better:
 ## One-click installer (for existing repositories)
 ```bash
 bash scripts/one_click_install.sh --target /absolute/path/to/target-repo
+# or legacy positional form:
+bash scripts/one_click_install.sh /absolute/path/to/target-repo
 ```
 
 Optional flags:
 - `--dry-run` preview install/normalize actions without writing files
 - `--backup` backup overwritten files/config under `.codex_install_backups/`
 - `--no-force` keep existing target files instead of overwriting
+- `--skip-normalize` preserve existing `.codex_bootstrap/config.json` (skip project-agnostic rewrite)
+- `--skip-verify` skip strict post-install verification
+- `--verify-max-age-seconds N` override freshness threshold for verification (default `1800`)
 
 Installer behavior:
 - installs both bundled kits (offline/local source, no git clone)
-- rewrites `.codex_bootstrap/config.json` to project-agnostic defaults (no framework-specific entry points/routing)
-- runs strict verification
+- rewrites `.codex_bootstrap/config.json` to project-agnostic defaults by default (use `--skip-normalize` to preserve custom config)
+- runs strict verification by default (freshness default `1800s`; override with `--verify-max-age-seconds`)
 
 ## Quality Gates
 Run the same validation bundle used in CI:

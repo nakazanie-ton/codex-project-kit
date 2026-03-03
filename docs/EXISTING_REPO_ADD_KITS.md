@@ -7,14 +7,19 @@ From the `codex-project-kit` root, run:
 
 ```bash
 bash scripts/one_click_install.sh --target /absolute/path/to/target-repo
+# or legacy positional target:
+bash scripts/one_click_install.sh /absolute/path/to/target-repo
 ```
 
 Optional safety flags:
 - `--dry-run` to preview all actions
 - `--backup` to back up overwritten files/config
 - `--no-force` to preserve existing files
+- `--skip-normalize` to preserve existing `.codex_bootstrap/config.json`
+- `--skip-verify` to skip strict post-install verification
+- `--verify-max-age-seconds N` to tune freshness threshold for verification checks
 
-This installer also normalizes `.codex_bootstrap/config.json` to a project-agnostic baseline (empty `entry_points` and `task_routing`, no preselected skills).
+By default this installer normalizes `.codex_bootstrap/config.json` to a project-agnostic baseline (empty `entry_points` and `task_routing`, no preselected skills).
 It uses bundled kit sources under `kits/` and does not clone external repositories.
 
 ## 2. CLI Connection
