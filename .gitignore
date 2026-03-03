@@ -1,0 +1,19 @@
+
+.codex/
+
+# >>> codex-bootstrap-kit (local-only)
+.local_codex/
+.codex_bootstrap/
+.githooks/pre-commit
+scripts/codex_bootstrap.sh
+scripts/codex_session.sh
+scripts/codex_verify_session.sh
+scripts/git_pre_commit_sync.sh
+scripts/install_git_hooks.sh
+# <<< codex-bootstrap-kit (local-only)
+
+# >>> codex-taskflow-kit (local-only)
+.codex_taskflow/
+scripts/codex_task.sh
+work/taskflow/
+# <<< codex-taskflow-kit (local-only)
