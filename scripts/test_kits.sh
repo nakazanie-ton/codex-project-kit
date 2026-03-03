@@ -34,7 +34,7 @@ assert_grep() {
   local pattern="$1"
   local file="$2"
   local message="$3"
-  if ! grep -Eq "$pattern" "$file"; then
+  if ! grep -Eq -- "$pattern" "$file"; then
     fail "$message (pattern: $pattern, file: $file)"
   fi
 }
@@ -45,7 +45,7 @@ assert_line_count() {
   local file="$3"
   local message="$4"
   local actual
-  actual="$(grep -Ec "$pattern" "$file" || true)"
+  actual="$(grep -Ec -- "$pattern" "$file" || true)"
   [[ "$actual" == "$expected" ]] || fail "$message (expected=$expected actual=$actual file=$file)"
 }
 
@@ -151,11 +151,12 @@ EOF
 run_non_destructive_mode_checks() {
   log "Running non-destructive mode checks"
 
-  local backup_repo dry_run_repo backup_root backup_file_path config_backup_count
+  local backup_repo dry_run_repo preserve_repo backup_root backup_file_path config_backup_count bad_age_status
 
   backup_repo="$(mktemp -d /tmp/codex-backup-mode-test.XXXXXX)"
   dry_run_repo="$(mktemp -d /tmp/codex-dry-run-mode-test.XXXXXX)"
-  TMP_PATHS+=("$backup_repo" "$dry_run_repo")
+  preserve_repo="$(mktemp -d /tmp/codex-preserve-config-test.XXXXXX)"
+  TMP_PATHS+=("$backup_repo" "$dry_run_repo" "$preserve_repo")
 
   git -C "$backup_repo" init -q
   mkdir -p "$backup_repo/scripts" "$backup_repo/.codex_bootstrap"
@@ -190,7 +191,37 @@ EOF
   if [[ -e "$dry_run_repo/scripts/codex_bootstrap.sh" ]]; then
     fail "one_click_install --dry-run unexpectedly wrote files"
   fi
-  assert_grep 'dry-run: skipped strict verification' "$dry_run_repo/dry-run.log" "dry-run output missing verification skip message"
+  assert_grep 'dry-run: would run strict verification' "$dry_run_repo/dry-run.log" "dry-run output missing verification plan message"
+
+  set +e
+  bash "$ROOT_DIR/scripts/one_click_install.sh" --target "$dry_run_repo" --dry-run --verify-max-age-seconds nope >"$dry_run_repo/invalid-age.out" 2>"$dry_run_repo/invalid-age.err"
+  bad_age_status=$?
+  set -e
+  [[ "$bad_age_status" -ne 0 ]] || fail "one_click_install accepted non-numeric --verify-max-age-seconds"
+  assert_grep '--verify-max-age-seconds must be a non-negative integer' "$dry_run_repo/invalid-age.err" "invalid verify max age message missing"
+
+  git -C "$preserve_repo" init -q
+  mkdir -p "$preserve_repo/.codex_bootstrap"
+  cat >"$preserve_repo/.codex_bootstrap/config.json" <<'EOF'
+{
+  "project_name": "custom-project",
+  "required_skills": ["skill-a"],
+  "startup_read_order": [
+    "scripts/codex_bootstrap.sh",
+    ".local_codex/CODEX_LOCAL_CHECKLIST.md",
+    ".local_codex/PROJECT_AGENT_STATE.json",
+    ".local_codex/PROJECT_NAVIGATION.md",
+    ".local_codex/PROJECT_DEPENDENCY_GRAPH.md"
+  ],
+  "required_files": [".local_codex/AGENT_STATE.md"],
+  "exclude_paths": [".git"],
+  "entry_points": {"backend_entry": "app/main.py"},
+  "task_routing": {"bugfix": ["app/api.py"]}
+}
+EOF
+  bash "$ROOT_DIR/scripts/one_click_install.sh" --target "$preserve_repo" --no-force --skip-normalize >/dev/null
+  assert_grep '"project_name":[[:space:]]*"custom-project"' "$preserve_repo/.codex_bootstrap/config.json" "custom config project_name was unexpectedly normalized"
+  assert_grep '"backend_entry":[[:space:]]*"app/main.py"' "$preserve_repo/.codex_bootstrap/config.json" "custom config entry_points was unexpectedly normalized"
 }
 
 run_config_validation_checks() {
@@ -413,6 +444,9 @@ run_docs_surface_checks() {
   assert_grep '^- Codex App$' "$ROOT_DIR/README.md" "README missing Codex App surface"
   assert_grep '^- AGENTS/Skills flow$' "$ROOT_DIR/README.md" "README missing AGENTS/Skills surface"
   assert_grep 'scripts/one_click_install\.sh --target /absolute/path/to/target-repo' "$ROOT_DIR/README.md" "README missing --target usage for one_click_install"
+  assert_grep 'scripts/one_click_install\.sh /absolute/path/to/target-repo' "$ROOT_DIR/README.md" "README missing legacy positional usage for one_click_install"
+  assert_grep '--skip-normalize' "$ROOT_DIR/README.md" "README missing --skip-normalize guidance"
+  assert_grep '--verify-max-age-seconds N' "$ROOT_DIR/README.md" "README missing verify max age guidance"
   assert_grep '\[LICENSE\]\(LICENSE\)' "$ROOT_DIR/README.md" "README missing LICENSE link"
   assert_grep '\[SECURITY\.md\]\(SECURITY\.md\)' "$ROOT_DIR/README.md" "README missing SECURITY link"
 }

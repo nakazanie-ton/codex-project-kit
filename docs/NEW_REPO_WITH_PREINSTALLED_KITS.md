@@ -14,6 +14,7 @@ bash scripts/normalize_bootstrap_config.sh --target /absolute/path/to/target-rep
 ```
 
 Optional safety flags:
+- `--check` to validate config shape without rewriting
 - `--dry-run` to preview rewrite without changing the file
 - `--backup` to keep a backup copy before rewrite
 
@@ -32,6 +33,8 @@ Manual strict verification:
 
 ```bash
 CODEX_BOOTSTRAP_REQUIRED=1 bash scripts/codex_verify_session.sh
+# for long sessions you can relax freshness checks:
+bash scripts/codex_verify_session.sh --max-age-seconds 86400
 ```
 
 ## 2. Codex App Connection
