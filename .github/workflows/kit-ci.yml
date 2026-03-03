@@ -1,0 +1,21 @@
+name: Kit CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate-kits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run kit validation
+        run: bash scripts/test_kits.sh

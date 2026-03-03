@@ -24,3 +24,17 @@ Installer behavior:
 - installs both bundled kits (offline/local source, no git clone)
 - rewrites `.codex_bootstrap/config.json` to project-agnostic defaults (no framework-specific entry points/routing)
 - runs strict verification
+
+## Quality Gates
+Run the same validation bundle used in CI:
+
+```bash
+bash scripts/test_kits.sh
+```
+
+Coverage includes:
+- syntax checks for shell/python sources
+- installer `.gitignore` resilience and idempotency
+- CLI applicability (`codex_session.sh`)
+- Codex App applicability (`codex_verify_session.sh`, `codex_task.sh`)
+- AGENTS/Skills applicability (startup contract and checklist state)
