@@ -3,13 +3,14 @@
 Use this runbook when a repository does not yet have bootstrap/taskflow kits.
 
 ## 1. One-Click Install
-From the `codex-orchestrator-kit` root, run:
+From the `codex-project-kit` root, run:
 
 ```bash
 bash scripts/one_click_install.sh /absolute/path/to/target-repo
 ```
 
 This installer also normalizes `.codex_bootstrap/config.json` to a project-agnostic baseline (empty `entry_points` and `task_routing`, no preselected skills).
+It uses bundled kit sources under `kits/` and does not clone external repositories.
 
 ## 2. CLI Connection
 Primary command:

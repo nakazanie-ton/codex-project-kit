@@ -13,6 +13,10 @@ If `.codex_bootstrap/config.json` contains framework-specific defaults, normaliz
 bash scripts/normalize_bootstrap_config.sh /absolute/path/to/target-repo
 ```
 
+For a single-package source of truth, bundled kit code lives under:
+- `kits/codex-bootstrap-kit`
+- `kits/codex-taskflow-kit`
+
 ## 1. CLI Connection
 Use strict startup as the default entrypoint:
 

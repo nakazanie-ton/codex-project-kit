@@ -1,13 +1,15 @@
-# codex-orchestrator-kit
+# codex-project-kit
 
-Orchestrator repository for connecting and operating two reusable kits together:
-- `codex-bootstrap-kit`
-- `codex-taskflow-kit`
+Unified repository for Codex bootstrap and taskflow in one package.
 
 This repo contains operator-grade instructions for three integration surfaces:
 - Codex CLI
 - Codex App
 - AGENTS/Skills flow
+
+## Bundled Kits
+- `kits/codex-bootstrap-kit`
+- `kits/codex-taskflow-kit`
 
 ## Runbooks
 - `docs/NEW_REPO_WITH_PREINSTALLED_KITS.md`
@@ -19,6 +21,6 @@ bash scripts/one_click_install.sh /absolute/path/to/target-repo
 ```
 
 Installer behavior:
-- installs both kits
+- installs both bundled kits (offline/local source, no git clone)
 - rewrites `.codex_bootstrap/config.json` to project-agnostic defaults (no framework-specific entry points/routing)
 - runs strict verification
