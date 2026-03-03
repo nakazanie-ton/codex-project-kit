@@ -21,43 +21,55 @@ Examples:
 USAGE
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
-
-if [[ ! -f "$ENGINE" ]]; then
-  echo "[taskflow] ERROR: engine not found: $ENGINE" >&2
-  exit 1
-fi
-
-if [[ -x "$BOOTSTRAP_SCRIPT" ]]; then
-  echo "[taskflow] running bootstrap before taskflow"
-  bash "$BOOTSTRAP_SCRIPT"
-
-  if [[ ! -f "$CHECKLIST" ]]; then
-    echo "[taskflow] ERROR: checklist not found after bootstrap: $CHECKLIST" >&2
+ensure_engine() {
+  if [[ ! -f "$ENGINE" ]]; then
+    echo "[taskflow] ERROR: engine not found: $ENGINE" >&2
     exit 1
   fi
+}
 
-  if ! grep -Eq "status:[[:space:]]*PASS" "$CHECKLIST"; then
-    echo "[taskflow] ERROR: bootstrap checklist status is not PASS" >&2
-    exit 1
+ensure_bootstrap_ready() {
+  if [[ -x "$BOOTSTRAP_SCRIPT" ]]; then
+    echo "[taskflow] running bootstrap before taskflow"
+    bash "$BOOTSTRAP_SCRIPT"
+
+    if [[ ! -f "$CHECKLIST" ]]; then
+      echo "[taskflow] ERROR: checklist not found after bootstrap: $CHECKLIST" >&2
+      exit 1
+    fi
+
+    if ! grep -Eq "status:[[:space:]]*PASS" "$CHECKLIST"; then
+      echo "[taskflow] ERROR: bootstrap checklist status is not PASS" >&2
+      exit 1
+    fi
+
+    echo "[taskflow] bootstrap checklist status: PASS"
+    return
   fi
 
-  echo "[taskflow] bootstrap checklist status: PASS"
-else
   if [[ "$REQUIRE_BOOTSTRAP" == "1" ]]; then
     echo "[taskflow] ERROR: bootstrap script is required but not found: $BOOTSTRAP_SCRIPT" >&2
     echo "[taskflow] install codex-bootstrap-kit or set CODEX_TASKFLOW_REQUIRE_BOOTSTRAP=0" >&2
     exit 1
   fi
+
   echo "[taskflow] WARNING: running without bootstrap (CODEX_TASKFLOW_REQUIRE_BOOTSTRAP=0)" >&2
+}
+
+ensure_python() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "[taskflow] ERROR: python3 is required" >&2
+    exit 1
+  fi
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "[taskflow] ERROR: python3 is required" >&2
-  exit 1
-fi
+ensure_engine
+ensure_bootstrap_ready
+ensure_python
 
 python3 "$ENGINE" --root "$ROOT_DIR" "$@"

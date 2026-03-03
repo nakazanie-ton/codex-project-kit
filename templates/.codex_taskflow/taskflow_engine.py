@@ -67,6 +67,99 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
+def resolve_title(args: argparse.Namespace, task_text: str) -> str:
+    if args.title.strip():
+        return args.title.strip()
+    if task_text:
+        return task_text.splitlines()[0].strip()
+    return "Untitled Task"
+
+
+def resolve_output_base(root: Path, out_dir_arg: str, out_dir_rel: str) -> Path:
+    if out_dir_arg:
+        return Path(out_dir_arg).resolve()
+    return root / out_dir_rel
+
+
+def build_template_data(
+    workflow_name: str,
+    version: str,
+    task_id: str,
+    created_at: str,
+    title: str,
+    task_text: str,
+    bootstrap_state: str,
+) -> dict[str, str]:
+    return {
+        "WORKFLOW_NAME": workflow_name,
+        "WORKFLOW_VERSION": version,
+        "TASK_ID": task_id,
+        "CREATED_AT": created_at,
+        "TASK_TITLE": title,
+        "TASK_TEXT": task_text or "TODO: add task details",
+        "BOOTSTRAP_STATUS": bootstrap_state,
+    }
+
+
+def generate_artifacts(
+    template_dir: Path,
+    task_dir: Path,
+    artifacts: dict[str, str],
+    template_data: dict[str, str],
+) -> dict[str, str]:
+    artifact_paths: dict[str, str] = {}
+    template_files = {
+        "intake": "intake.md",
+        "scope": "scope.md",
+        "plan": "plan.md",
+        "execute": "execution_log.md",
+        "verify": "verification.md",
+        "handoff": "handoff.md",
+    }
+
+    for key, output_name in artifacts.items():
+        template_name = template_files.get(key)
+        if not template_name:
+            continue
+        src_template = template_dir / template_name
+        if not src_template.exists():
+            raise SystemExit(f"Template not found: {src_template}")
+        dst = task_dir / output_name
+        content = render_template(src_template, template_data)
+        write_text(dst, content)
+        artifact_paths[key] = str(dst)
+
+    return artifact_paths
+
+
+def build_taskflow_json(
+    workflow_name: str,
+    version: str,
+    task_id: str,
+    created_at: str,
+    title: str,
+    task_text: str,
+    bootstrap_state: str,
+    root: Path,
+    task_dir: Path,
+    steps: list[dict[str, Any]],
+    artifact_paths: dict[str, str],
+) -> dict[str, Any]:
+    return {
+        "workflow_name": workflow_name,
+        "workflow_version": version,
+        "task_id": task_id,
+        "created_at": created_at,
+        "task_title": title,
+        "task_text": task_text,
+        "bootstrap_status": bootstrap_state,
+        "root": str(root),
+        "task_dir": str(task_dir),
+        "steps": steps,
+        "artifacts": artifact_paths,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate universal taskflow artifacts")
     parser.add_argument("--root", required=True, help="Repository root")
@@ -91,10 +184,10 @@ def main() -> None:
     version = str(config.get("version", "1.0.0"))
     out_dir_rel = str(config.get("out_dir", "work/taskflow"))
 
-    title = args.title.strip() or (task_text.splitlines()[0].strip() if task_text else "Untitled Task")
+    title = resolve_title(args, task_text)
     task_id = f"{now_stamp()}-{slugify(title)}"
 
-    out_base = Path(args.out_dir).resolve() if args.out_dir else (root / out_dir_rel)
+    out_base = resolve_output_base(root, args.out_dir, out_dir_rel)
     task_dir = out_base / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
 
@@ -104,53 +197,37 @@ def main() -> None:
     created_at = now_utc()
     bootstrap_state = checklist_status(root)
 
-    template_data = {
-        "WORKFLOW_NAME": workflow_name,
-        "WORKFLOW_VERSION": version,
-        "TASK_ID": task_id,
-        "CREATED_AT": created_at,
-        "TASK_TITLE": title,
-        "TASK_TEXT": task_text or "TODO: add task details",
-        "BOOTSTRAP_STATUS": bootstrap_state,
-    }
-
+    template_data = build_template_data(
+        workflow_name=workflow_name,
+        version=version,
+        task_id=task_id,
+        created_at=created_at,
+        title=title,
+        task_text=task_text,
+        bootstrap_state=bootstrap_state,
+    )
     template_dir = root / ".codex_taskflow" / "templates"
 
-    artifact_paths: dict[str, str] = {}
-    template_files = {
-        "intake": "intake.md",
-        "scope": "scope.md",
-        "plan": "plan.md",
-        "execute": "execution_log.md",
-        "verify": "verification.md",
-        "handoff": "handoff.md",
-    }
+    artifact_paths = generate_artifacts(
+        template_dir=template_dir,
+        task_dir=task_dir,
+        artifacts=artifacts,
+        template_data=template_data,
+    )
 
-    for key, output_name in artifacts.items():
-        template_name = template_files.get(key)
-        if not template_name:
-            continue
-        src_template = template_dir / template_name
-        if not src_template.exists():
-            raise SystemExit(f"Template not found: {src_template}")
-        dst = task_dir / output_name
-        content = render_template(src_template, template_data)
-        write_text(dst, content)
-        artifact_paths[key] = str(dst)
-
-    taskflow_json = {
-        "workflow_name": workflow_name,
-        "workflow_version": version,
-        "task_id": task_id,
-        "created_at": created_at,
-        "task_title": title,
-        "task_text": task_text,
-        "bootstrap_status": bootstrap_state,
-        "root": str(root),
-        "task_dir": str(task_dir),
-        "steps": steps,
-        "artifacts": artifact_paths,
-    }
+    taskflow_json = build_taskflow_json(
+        workflow_name=workflow_name,
+        version=version,
+        task_id=task_id,
+        created_at=created_at,
+        title=title,
+        task_text=task_text,
+        bootstrap_state=bootstrap_state,
+        root=root,
+        task_dir=task_dir,
+        steps=steps,
+        artifact_paths=artifact_paths,
+    )
 
     json_path = task_dir / "taskflow.json"
     write_text(json_path, json.dumps(taskflow_json, ensure_ascii=True, indent=2))
