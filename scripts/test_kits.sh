@@ -107,6 +107,51 @@ EOF
   assert_line_count '^# >>> codex-taskflow-kit \(local-only\)$' "1" "$taskflow_repo/.gitignore" "taskflow marker duplicated"
 }
 
+run_non_destructive_mode_checks() {
+  log "Running non-destructive mode checks"
+
+  local backup_repo dry_run_repo backup_root backup_file_path config_backup_count
+
+  backup_repo="$(mktemp -d /tmp/codex-backup-mode-test.XXXXXX)"
+  dry_run_repo="$(mktemp -d /tmp/codex-dry-run-mode-test.XXXXXX)"
+  TMP_PATHS+=("$backup_repo" "$dry_run_repo")
+
+  git -C "$backup_repo" init -q
+  mkdir -p "$backup_repo/scripts" "$backup_repo/.codex_bootstrap"
+  cat >"$backup_repo/scripts/codex_session.sh" <<'EOF'
+#!/usr/bin/env bash
+echo ORIGINAL_SESSION
+EOF
+  cat >"$backup_repo/.codex_bootstrap/config.json" <<'EOF'
+{"project_name":"before-normalize"}
+EOF
+  chmod +x "$backup_repo/scripts/codex_session.sh"
+
+  bash "$ROOT_DIR/kits/codex-bootstrap-kit/bin/install.sh" --target "$backup_repo" --force --backup >/dev/null
+  assert_grep '^#!/usr/bin/env bash$' "$backup_repo/scripts/codex_session.sh" "bootstrap install did not overwrite target file"
+
+  backup_root="$(find "$backup_repo/.codex_install_backups/codex-bootstrap-kit" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  [[ -n "${backup_root:-}" ]] || fail "backup directory was not created for bootstrap installer"
+  backup_file_path="$backup_root/scripts/codex_session.sh"
+  assert_file "$backup_file_path"
+  assert_grep '^echo ORIGINAL_SESSION$' "$backup_file_path" "backup file does not contain original script content"
+
+  sleep 1
+  bash "$ROOT_DIR/scripts/normalize_bootstrap_config.sh" "$backup_repo" --backup >/dev/null
+  assert_grep '"project_name":[[:space:]]*""' "$backup_repo/.codex_bootstrap/config.json" "normalize script did not rewrite config"
+  config_backup_count="$(find "$backup_repo/.codex_install_backups/codex-bootstrap-kit" -type f -path '*/.codex_bootstrap/config.json' | wc -l | tr -d ' ')"
+  if [[ "$config_backup_count" -lt 2 ]]; then
+    fail "expected config backups from installer + normalize step, found $config_backup_count"
+  fi
+
+  git -C "$dry_run_repo" init -q
+  bash "$ROOT_DIR/scripts/one_click_install.sh" "$dry_run_repo" --dry-run >"$dry_run_repo/dry-run.log"
+  if [[ -e "$dry_run_repo/scripts/codex_bootstrap.sh" ]]; then
+    fail "one_click_install --dry-run unexpectedly wrote files"
+  fi
+  assert_grep 'dry-run: skipped strict verification' "$dry_run_repo/dry-run.log" "dry-run output missing verification skip message"
+}
+
 run_surface_smoke_checks() {
   log "Running surface smoke checks (CLI / Codex App / Agent Skills)"
 
@@ -188,6 +233,7 @@ run_docs_surface_checks() {
 main() {
   run_syntax_gates
   run_gitignore_resilience_checks
+  run_non_destructive_mode_checks
   run_surface_smoke_checks
   run_docs_surface_checks
   log "All checks passed"

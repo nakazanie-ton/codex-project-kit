@@ -58,4 +58,6 @@ bash bin/install.sh --target /path/to/repo
 ```
 
 Use `--force` to overwrite existing files.
+Use `--dry-run` to preview actions without writing files.
+Use `--backup` to save overwritten files under `.codex_install_backups/codex-taskflow-kit/<timestamp>/`.
 Installer also adds a managed local-only block to target `.gitignore` so taskflow files/artifacts are not tracked.

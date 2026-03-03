@@ -24,6 +24,8 @@ bash bin/install.sh --target /path/to/repo
 ```
 
 Use `--force` to overwrite existing files.
+Use `--dry-run` to preview actions without writing files.
+Use `--backup` to save overwritten files under `.codex_install_backups/codex-bootstrap-kit/<timestamp>/`.
 Installer also adds a managed local-only block to target `.gitignore` so bootstrap files are not tracked.
 Strict mode is enabled by default (`CODEX_BOOTSTRAP_REQUIRED=1` unless explicitly overridden).
 

@@ -20,6 +20,11 @@ This repo contains operator-grade instructions for three integration surfaces:
 bash scripts/one_click_install.sh /absolute/path/to/target-repo
 ```
 
+Optional flags:
+- `--dry-run` preview install/normalize actions without writing files
+- `--backup` backup overwritten files/config under `.codex_install_backups/`
+- `--no-force` keep existing target files instead of overwriting
+
 Installer behavior:
 - installs both bundled kits (offline/local source, no git clone)
 - rewrites `.codex_bootstrap/config.json` to project-agnostic defaults (no framework-specific entry points/routing)

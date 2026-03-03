@@ -9,6 +9,11 @@ From the `codex-project-kit` root, run:
 bash scripts/one_click_install.sh /absolute/path/to/target-repo
 ```
 
+Optional safety flags:
+- `--dry-run` to preview all actions
+- `--backup` to back up overwritten files/config
+- `--no-force` to preserve existing files
+
 This installer also normalizes `.codex_bootstrap/config.json` to a project-agnostic baseline (empty `entry_points` and `task_routing`, no preselected skills).
 It uses bundled kit sources under `kits/` and does not clone external repositories.
 

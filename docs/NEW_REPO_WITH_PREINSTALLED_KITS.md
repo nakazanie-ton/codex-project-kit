@@ -13,6 +13,10 @@ If `.codex_bootstrap/config.json` contains framework-specific defaults, normaliz
 bash scripts/normalize_bootstrap_config.sh /absolute/path/to/target-repo
 ```
 
+Optional safety flags:
+- `--dry-run` to preview rewrite without changing the file
+- `--backup` to keep a backup copy before rewrite
+
 For a single-package source of truth, bundled kit code lives under:
 - `kits/codex-bootstrap-kit`
 - `kits/codex-taskflow-kit`
