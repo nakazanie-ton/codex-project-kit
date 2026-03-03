@@ -28,6 +28,10 @@ Use `--dry-run` to preview actions without writing files.
 Use `--backup` to save overwritten files under `.codex_install_backups/codex-bootstrap-kit/<timestamp>/`.
 Installer also adds a managed local-only block to target `.gitignore` so bootstrap files are not tracked.
 Strict mode is enabled by default (`CODEX_BOOTSTRAP_REQUIRED=1` unless explicitly overridden).
+Bootstrap output can be tuned with `CODEX_BOOTSTRAP_LOG_LEVEL`:
+- `full` (default): print checklist + state excerpts
+- `summary`: print checklist + loaded file names only
+- `quiet`: suppress non-error output
 
 ## First Run In Target Repo
 

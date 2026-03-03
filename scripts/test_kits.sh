@@ -213,6 +213,20 @@ run_surface_smoke_checks() {
   assert_file "$target_repo/scripts/codex_verify_session.sh"
   assert_file "$target_repo/scripts/codex_task.sh"
 
+  # Bootstrap output control surface.
+  (
+    cd "$target_repo"
+    CODEX_BOOTSTRAP_LOG_LEVEL=summary bash scripts/codex_bootstrap.sh >"$target_repo/bootstrap-summary.out" 2>"$target_repo/bootstrap-summary.err"
+    CODEX_BOOTSTRAP_LOG_LEVEL=quiet bash scripts/codex_bootstrap.sh >"$target_repo/bootstrap-quiet.out" 2>"$target_repo/bootstrap-quiet.err"
+  )
+  assert_grep '^- loaded: AGENT_STATE\.md$' "$target_repo/bootstrap-summary.out" "summary log level did not emit loaded file names"
+  if grep -Eq '^## Scope$' "$target_repo/bootstrap-summary.out"; then
+    fail "summary log level leaked full state file content"
+  fi
+  if [[ -s "$target_repo/bootstrap-quiet.out" ]]; then
+    fail "quiet log level unexpectedly emitted stdout"
+  fi
+
   # CLI surface: run session with executable path containing spaces.
   cli_cmd="/tmp/codex cli smoke shim.sh"
   TMP_PATHS+=("$cli_cmd")

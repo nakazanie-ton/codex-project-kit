@@ -6,8 +6,22 @@ STATE_DIR="$ROOT_DIR/.local_codex"
 GENERATOR="$ROOT_DIR/.codex_bootstrap/bootstrap/generate_codex_state.py"
 CONFIG_FILE="${CODEX_BOOTSTRAP_CONFIG:-$ROOT_DIR/.codex_bootstrap/config.json}"
 CHECKLIST_FILE="$STATE_DIR/CODEX_LOCAL_CHECKLIST.md"
+LOG_LEVEL="${CODEX_BOOTSTRAP_LOG_LEVEL:-full}"
 
 mkdir -p "$STATE_DIR"
+
+case "$LOG_LEVEL" in
+  full|summary|quiet) ;;
+  *)
+    echo "[codex-bootstrap] ERROR: invalid CODEX_BOOTSTRAP_LOG_LEVEL='$LOG_LEVEL' (expected: full|summary|quiet)" >&2
+    exit 1
+    ;;
+esac
+
+log() {
+  [[ "$LOG_LEVEL" == "quiet" ]] && return
+  echo "$1"
+}
 
 if [[ ! -f "$GENERATOR" ]]; then
   echo "[codex-bootstrap] ERROR: generator not found: $GENERATOR" >&2
@@ -21,17 +35,17 @@ fi
 
 python3 "$GENERATOR" --root "$ROOT_DIR" --config "$CONFIG_FILE"
 
-echo "Status checklist saved: CODEX_LOCAL_CHECKLIST.md"
-if [[ -f "$CHECKLIST_FILE" ]]; then
+log "Status checklist saved: CODEX_LOCAL_CHECKLIST.md"
+if [[ -f "$CHECKLIST_FILE" && "$LOG_LEVEL" != "quiet" ]]; then
   sed -n '1,40p' "$CHECKLIST_FILE"
 fi
 
-echo "=================================================="
-echo "Codex Agent Bootstrap"
-echo "=================================================="
-echo "This script restores project context at every start."
-echo "Loaded state files:"
-echo ""
+log "=================================================="
+log "Codex Agent Bootstrap"
+log "=================================================="
+log "This script restores project context at every start."
+log "Loaded state files:"
+log ""
 
 for file in \
   "$STATE_DIR/AGENT_STATE.md" \
@@ -40,10 +54,14 @@ for file in \
   "$STATE_DIR/PROJECT_NAVIGATION.md" \
   "$STATE_DIR/PROJECT_DEPENDENCY_GRAPH.md"; do
   if [[ -f "$file" ]]; then
-    echo "===== $(basename "$file") ====="
-    sed -n '1,80p' "$file"
-    echo ""
+    if [[ "$LOG_LEVEL" == "full" ]]; then
+      echo "===== $(basename "$file") ====="
+      sed -n '1,80p' "$file"
+      echo ""
+    elif [[ "$LOG_LEVEL" == "summary" ]]; then
+      echo "- loaded: $(basename "$file")"
+    fi
   fi
 done
 
-echo "Done."
+log "Done."
