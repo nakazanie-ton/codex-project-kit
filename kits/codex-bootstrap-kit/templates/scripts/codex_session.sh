@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PRIME_CONTEXT="${CODEX_SESSION_PRIME_CONTEXT:-1}"
 PRIMER_FILE="$ROOT_DIR/.local_codex/SESSION_PRIMER.md"
+KIT_SOURCE_FILE="$ROOT_DIR/.codex_bootstrap/KIT_SOURCE_REPO"
+KIT_AUTO_UPDATE="${CODEX_KIT_AUTO_UPDATE:-1}"
 export CODEX_BOOTSTRAP_REQUIRED="${CODEX_BOOTSTRAP_REQUIRED:-1}"
 
 is_codex_command() {
@@ -53,6 +55,47 @@ resolve_primer() {
 
   default_primer
 }
+
+resolve_kit_source_repo() {
+  local source_repo="${CODEX_KIT_SOURCE_REPO:-}"
+  if [[ -n "$source_repo" ]]; then
+    printf "%s" "$source_repo"
+    return
+  fi
+
+  if [[ -s "$KIT_SOURCE_FILE" ]]; then
+    sed -n '1p' "$KIT_SOURCE_FILE" | tr -d '\r'
+  fi
+}
+
+sync_from_kit_repo_if_configured() {
+  local source_repo updater
+
+  case "$KIT_AUTO_UPDATE" in
+    1) ;;
+    0) return ;;
+    *)
+      echo "[session] WARNING: invalid CODEX_KIT_AUTO_UPDATE='$KIT_AUTO_UPDATE' (expected 0|1); skipping auto-update" >&2
+      return
+      ;;
+  esac
+
+  source_repo="$(resolve_kit_source_repo)"
+  [[ -n "$source_repo" ]] || return
+  [[ "$source_repo" != "$ROOT_DIR" ]] || return
+
+  updater="$source_repo/scripts/one_click_install.sh"
+  if [[ ! -f "$updater" ]]; then
+    echo "[session] WARNING: kit auto-update source missing installer: $updater" >&2
+    return
+  fi
+
+  if ! bash "$updater" --target "$ROOT_DIR" --skip-normalize --skip-verify >/dev/null; then
+    echo "[session] WARNING: kit auto-update failed from source: $source_repo" >&2
+  fi
+}
+
+sync_from_kit_repo_if_configured
 
 if (( $# > 0 )); then
   # Explicit command was passed by caller (for example: acodex -> codex_session.sh codex ...)

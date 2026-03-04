@@ -116,6 +116,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BOOTSTRAP_KIT="$REPO_ROOT/kits/codex-bootstrap-kit"
 TASKFLOW_KIT="$REPO_ROOT/kits/codex-taskflow-kit"
 NORMALIZE_SCRIPT="$SCRIPT_DIR/normalize_bootstrap_config.sh"
+KIT_SOURCE_FILE_REL=".codex_bootstrap/KIT_SOURCE_REPO"
+
+write_kit_source_marker() {
+  local marker="$TARGET/$KIT_SOURCE_FILE_REL"
+  mkdir -p "$(dirname "$marker")"
+  printf "%s\n" "$REPO_ROOT" >"$marker"
+  echo "[orchestrator] recorded kit source repo marker: $KIT_SOURCE_FILE_REL"
+}
 
 if [[ ! -f "$BOOTSTRAP_KIT/bin/install.sh" ]]; then
   fail "missing bundled bootstrap kit: $BOOTSTRAP_KIT"
@@ -155,6 +163,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   else
     echo "[orchestrator] dry-run: would normalize bootstrap config: $TARGET/.codex_bootstrap/config.json"
   fi
+  echo "[orchestrator] dry-run: would record kit source repo marker: $TARGET/$KIT_SOURCE_FILE_REL"
   if [[ "$SKIP_VERIFY" -eq 1 ]]; then
     echo "[orchestrator] dry-run: would skip strict verification"
   elif [[ "$VERIFY_MAX_AGE_SET" -eq 1 ]]; then
@@ -171,6 +180,8 @@ if [[ "$SKIP_NORMALIZE" -eq 1 ]]; then
 else
   bash "$NORMALIZE_SCRIPT" "${NORMALIZE_ARGS[@]}"
 fi
+
+write_kit_source_marker
 
 cd "$TARGET"
 if [[ "$SKIP_VERIFY" -eq 1 ]]; then

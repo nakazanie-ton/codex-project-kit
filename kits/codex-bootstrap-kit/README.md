@@ -83,6 +83,14 @@ Automatic context primer (enabled by default):
 - default primer also includes taskflow routing hints (`scripts/codex_task.sh`, `work/taskflow/*`, `scripts/codex_task_lint.sh`) when those scripts exist in repo
 - set `CODEX_SESSION_PRIME_CONTEXT=0` to disable
 
+Kit auto-update on session start (enabled by default):
+- `scripts/codex_session.sh` runs kit sync before bootstrap when source is configured.
+- Source resolution order:
+  - `CODEX_KIT_SOURCE_REPO` env var (absolute path to `codex-project-kit` repo)
+  - `.codex_bootstrap/KIT_SOURCE_REPO` marker file (written by `scripts/one_click_install.sh`)
+- `CODEX_KIT_AUTO_UPDATE=1` (default) enables sync each start.
+- Set `CODEX_KIT_AUTO_UPDATE=0` to disable automatic sync.
+
 ## Hook Integration
 
 ```bash

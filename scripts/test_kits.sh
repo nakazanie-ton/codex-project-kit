@@ -594,7 +594,7 @@ run_tree_exclusion_checks() {
 run_surface_smoke_checks() {
   log "Running surface smoke checks (CLI / Codex App / Agent Skills)"
 
-  local target_repo cli_cmd task_json codex_prime_dir
+  local target_repo cli_cmd task_json codex_prime_dir kit_source_repo
   target_repo="$(mktemp -d /tmp/codex-surface-smoke.XXXXXX)"
   TMP_PATHS+=("$target_repo")
   git -C "$target_repo" init -q
@@ -606,6 +606,10 @@ run_surface_smoke_checks() {
   assert_file "$target_repo/scripts/codex_task.sh"
   assert_file "$target_repo/scripts/codex_task_lint.sh"
   assert_file "$target_repo/.local_codex/SESSION_PRIMER.md"
+  assert_file "$target_repo/.codex_bootstrap/KIT_SOURCE_REPO"
+  if [[ "$(tr -d '\r\n' < "$target_repo/.codex_bootstrap/KIT_SOURCE_REPO")" != "$ROOT_DIR" ]]; then
+    fail "kit source marker did not persist orchestrator repo root"
+  fi
   assert_grep 'CONTEXT_COMPACT\.md' "$target_repo/.local_codex/SESSION_PRIMER.md" "session primer missing compact context guidance"
   assert_grep 'scripts/codex_task\.sh' "$target_repo/.local_codex/SESSION_PRIMER.md" "session primer missing taskflow bootstrap routing"
   assert_grep 'scripts/codex_task_lint\.sh --latest --mode complete' "$target_repo/.local_codex/SESSION_PRIMER.md" "session primer missing taskflow lint routing"
@@ -662,6 +666,62 @@ EOF
   chmod +x "$cli_cmd"
   CODEX_SESSION_CMD="$cli_cmd" bash "$target_repo/scripts/codex_session.sh" >"$target_repo/cli.out" 2>"$target_repo/cli.err"
   assert_grep '^CLI_SMOKE_OK$' "$target_repo/cli.out" "CLI surface failed to execute CODEX_SESSION_CMD"
+
+  # Session auto-update surface: codex_session should sync from configured kit repo by default.
+  kit_source_repo="$(mktemp -d /tmp/codex-kit-source-smoke.XXXXXX)"
+  TMP_PATHS+=("$kit_source_repo")
+  mkdir -p "$kit_source_repo/scripts"
+  cat >"$kit_source_repo/scripts/one_click_install.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+log_file="${CODEX_KIT_TEST_LOG:?CODEX_KIT_TEST_LOG is required}"
+target=""
+
+printf "%s\n" "$*" >"$log_file.args"
+while (( $# > 0 )); do
+  case "$1" in
+    --target)
+      shift || true
+      target="${1:-}"
+      ;;
+  esac
+  shift || true
+done
+printf "%s\n" "$target" >"$log_file.target"
+EOF
+  chmod +x "$kit_source_repo/scripts/one_click_install.sh"
+
+  (
+    cd "$target_repo"
+    CODEX_BOOTSTRAP_LOG_LEVEL=quiet \
+    CODEX_SESSION_CMD="$cli_cmd" \
+    CODEX_SESSION_PRIME_CONTEXT=0 \
+    CODEX_KIT_SOURCE_REPO="$kit_source_repo" \
+    CODEX_KIT_TEST_LOG="$target_repo/kit-update-enabled" \
+    bash scripts/codex_session.sh >"$target_repo/kit-update-enabled.out" 2>"$target_repo/kit-update-enabled.err"
+  )
+  assert_file "$target_repo/kit-update-enabled.args"
+  assert_file "$target_repo/kit-update-enabled.target"
+  if [[ "$(tr -d '\r\n' < "$target_repo/kit-update-enabled.target")" != "$target_repo" ]]; then
+    fail "session auto-update did not pass target repo path to installer"
+  fi
+  assert_grep '--skip-normalize' "$target_repo/kit-update-enabled.args" "session auto-update missing --skip-normalize"
+  assert_grep '--skip-verify' "$target_repo/kit-update-enabled.args" "session auto-update missing --skip-verify"
+
+  (
+    cd "$target_repo"
+    CODEX_BOOTSTRAP_LOG_LEVEL=quiet \
+    CODEX_SESSION_CMD="$cli_cmd" \
+    CODEX_SESSION_PRIME_CONTEXT=0 \
+    CODEX_KIT_SOURCE_REPO="$kit_source_repo" \
+    CODEX_KIT_AUTO_UPDATE=0 \
+    CODEX_KIT_TEST_LOG="$target_repo/kit-update-disabled" \
+    bash scripts/codex_session.sh >"$target_repo/kit-update-disabled.out" 2>"$target_repo/kit-update-disabled.err"
+  )
+  if [[ -f "$target_repo/kit-update-disabled.args" || -f "$target_repo/kit-update-disabled.target" ]]; then
+    fail "session auto-update executed despite CODEX_KIT_AUTO_UPDATE=0"
+  fi
 
   # Codex App surface: setup script + verify action + taskflow action.
   (

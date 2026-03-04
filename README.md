@@ -78,6 +78,7 @@ Installer behavior:
 - installs both bundled kits (offline/local source, no git clone)
 - rewrites `.codex_bootstrap/config.json` to project-agnostic defaults by default (use `--skip-normalize` to preserve custom config)
 - runs strict verification by default (freshness default `1800s`; override with `--verify-max-age-seconds`)
+- records source marker at `.codex_bootstrap/KIT_SOURCE_REPO` for session auto-update
 
 ## Quality Gates
 Run the same validation bundle used in CI:
