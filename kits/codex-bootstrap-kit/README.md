@@ -93,6 +93,8 @@ Default template values are intentionally project-agnostic:
 - no preselected required skills
 - empty `entry_points` and `task_routing`
 - generic `exclude_paths` (not tied to a specific backend/frontend stack)
+- tree snapshot respects `.gitignore` automatically when running inside a git repository
+- `exclude_paths` entries without `/` (for example `node_modules`, `.venv`) are treated as directory-name excludes anywhere in the tree snapshot
 
 ## Extract As Separate GitHub Repo
 

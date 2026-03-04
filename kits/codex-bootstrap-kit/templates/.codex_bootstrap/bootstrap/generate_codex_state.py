@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -33,8 +34,33 @@ DEFAULT_STARTUP_ORDER = [
 
 DEFAULT_EXCLUDE_PATHS = {
     ".git",
+    ".hg",
+    ".svn",
     "node_modules",
+    ".pnpm-store",
+    ".yarn",
+    ".turbo",
+    ".parcel-cache",
     ".venv",
+    "venv",
+    "env",
+    ".direnv",
+    ".tox",
+    ".nox",
+    "__pypackages__",
+    ".eggs",
+    ".ipynb_checkpoints",
+    ".next",
+    ".nuxt",
+    ".svelte-kit",
+    ".terraform",
+    ".terragrunt-cache",
+    ".serverless",
+    ".aws-sam",
+    ".idea",
+    ".vscode",
+    ".gradle",
+    ".dart_tool",
     ".cache",
     ".pytest_cache",
     ".mypy_cache",
@@ -70,6 +96,89 @@ def normalize_rel_path(path: str) -> str:
     while normalized.startswith("./"):
         normalized = normalized[2:]
     return normalized.strip("/")
+
+
+def build_exclude_matchers(exclude_paths: set[str]) -> tuple[set[str], set[str]]:
+    exact_paths: set[str] = set()
+    dir_names: set[str] = set()
+    for item in exclude_paths:
+        normalized = normalize_rel_path(item)
+        if not normalized:
+            continue
+        exact_paths.add(normalized)
+        if "/" not in normalized:
+            dir_names.add(normalized)
+    return exact_paths, dir_names
+
+
+def is_path_excluded(
+    rel_path: str,
+    exclude_exact_paths: set[str],
+    exclude_dir_names: set[str],
+) -> bool:
+    normalized = normalize_rel_path(rel_path)
+    if not normalized:
+        return False
+
+    parts = normalized.split("/")
+    if "__pycache__" in parts:
+        return True
+    if any(part in exclude_dir_names for part in parts):
+        return True
+
+    return any(
+        normalized == excluded or normalized.startswith(f"{excluded}/")
+        for excluded in exclude_exact_paths
+    )
+
+
+def add_file_with_parents(entries: set[str], rel_file: str) -> None:
+    normalized = normalize_rel_path(rel_file)
+    if not normalized:
+        return
+
+    parts = normalized.split("/")
+    for depth in range(1, len(parts)):
+        entries.add(f"./{'/'.join(parts[:depth])}")
+    entries.add(f"./{normalized}")
+
+
+def build_tree_snapshot_from_git(
+    root: Path,
+    exclude_exact_paths: set[str],
+    exclude_dir_names: set[str],
+) -> list[str] | None:
+    if not (root / ".git").exists():
+        return None
+
+    try:
+        probe = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if probe.stdout.strip() != "true":
+            return None
+
+        listed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+    entries: set[str] = {"."}
+    for raw in listed.stdout.split(b"\0"):
+        if not raw:
+            continue
+        rel_file = normalize_rel_path(raw.decode("utf-8", errors="surrogateescape"))
+        if is_path_excluded(rel_file, exclude_exact_paths=exclude_exact_paths, exclude_dir_names=exclude_dir_names):
+            continue
+        add_file_with_parents(entries, rel_file)
+
+    return sorted(entries)
 
 
 def require_list_of_strings(value: Any, field: str) -> list[str]:
@@ -151,32 +260,39 @@ def load_config(root: Path, config_path: Path) -> BootstrapConfig:
     )
 
 
-def should_skip_dir(rel_dir: str, dir_name: str, exclude_paths: set[str]) -> bool:
-    if dir_name == "__pycache__":
-        return True
-    rel = normalize_rel_path(f"{rel_dir}/{dir_name}" if rel_dir != "." else dir_name)
-    return rel in exclude_paths
-
-
 def build_tree_snapshot(root: Path, exclude_paths: set[str]) -> list[str]:
-    entries: set[str] = {"."}
+    exclude_exact_paths, exclude_dir_names = build_exclude_matchers(exclude_paths)
 
+    git_entries = build_tree_snapshot_from_git(
+        root,
+        exclude_exact_paths=exclude_exact_paths,
+        exclude_dir_names=exclude_dir_names,
+    )
+    if git_entries is not None:
+        return git_entries
+
+    entries: set[str] = {"."}
     for current, dirs, files in os.walk(root):
         current_path = Path(current)
         rel_dir = "." if current_path == root else current_path.relative_to(root).as_posix()
 
         kept_dirs: list[str] = []
         for dir_name in dirs:
-            if should_skip_dir(rel_dir, dir_name, exclude_paths):
+            rel_dir_path = normalize_rel_path(f"{rel_dir}/{dir_name}" if rel_dir != "." else dir_name)
+            if is_path_excluded(
+                rel_dir_path,
+                exclude_exact_paths=exclude_exact_paths,
+                exclude_dir_names=exclude_dir_names,
+            ):
                 continue
             kept_dirs.append(dir_name)
-            rel = normalize_rel_path(f"{rel_dir}/{dir_name}" if rel_dir != "." else dir_name)
-            entries.add(f"./{rel}")
         dirs[:] = kept_dirs
 
         for file_name in files:
             rel_file = normalize_rel_path(f"{rel_dir}/{file_name}" if rel_dir != "." else file_name)
-            entries.add(f"./{rel_file}")
+            if is_path_excluded(rel_file, exclude_exact_paths=exclude_exact_paths, exclude_dir_names=exclude_dir_names):
+                continue
+            add_file_with_parents(entries, rel_file)
 
     return sorted(entries)
 

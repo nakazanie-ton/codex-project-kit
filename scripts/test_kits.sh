@@ -306,6 +306,72 @@ EOF
   assert_grep "missing required step id\\(s\\)|missing required artifact key\\(s\\)" "$validation_repo/taskflow-invalid.err" "taskflow config validation message missing"
 }
 
+run_tree_exclusion_checks() {
+  log "Running tree exclusion checks"
+
+  local tree_repo tree_file nongit_repo nongit_tree
+  tree_repo="$(mktemp -d /tmp/codex-tree-exclude-test.XXXXXX)"
+  TMP_PATHS+=("$tree_repo")
+  git -C "$tree_repo" init -q
+
+  bash "$ROOT_DIR/scripts/one_click_install.sh" --target "$tree_repo" >/dev/null
+  printf '\ncache_custom/\n' >>"$tree_repo/.gitignore"
+
+  mkdir -p \
+    "$tree_repo/cache_custom/generated" \
+    "$tree_repo/packages/app/node_modules/react" \
+    "$tree_repo/backend/venv/lib/python3.11/site-packages/demo_pkg" \
+    "$tree_repo/service/.venv/lib/site-packages/demo_pkg" \
+    "$tree_repo/frontend/.next/cache" \
+    "$tree_repo/src"
+  touch \
+    "$tree_repo/cache_custom/generated/blob.bin" \
+    "$tree_repo/packages/app/node_modules/react/index.js" \
+    "$tree_repo/backend/venv/lib/python3.11/site-packages/demo_pkg/__init__.py" \
+    "$tree_repo/service/.venv/lib/site-packages/demo_pkg/__init__.py" \
+    "$tree_repo/frontend/.next/cache/trace.txt" \
+    "$tree_repo/src/main.py"
+
+  (
+    cd "$tree_repo"
+    CODEX_BOOTSTRAP_LOG_LEVEL=quiet bash scripts/codex_bootstrap.sh
+  )
+
+  tree_file="$tree_repo/.local_codex/PROJECT_TREE.txt"
+  assert_file "$tree_file"
+
+  if rg -n '(^|/)(node_modules|venv|\.venv|\.next|cache_custom)(/|$)|site-packages' -S "$tree_file" >/dev/null; then
+    fail "tree snapshot included excluded dependency/build directories"
+  fi
+  assert_grep '^\./src/main\.py$' "$tree_file" "tree snapshot missed expected source file"
+
+  nongit_repo="$(mktemp -d /tmp/codex-tree-exclude-nongit.XXXXXX)"
+  TMP_PATHS+=("$nongit_repo")
+  mkdir -p \
+    "$nongit_repo/packages/app/node_modules/react" \
+    "$nongit_repo/backend/venv/lib/python3.11/site-packages/demo_pkg" \
+    "$nongit_repo/service/.venv/lib/site-packages/demo_pkg" \
+    "$nongit_repo/frontend/.next/cache" \
+    "$nongit_repo/src"
+  touch \
+    "$nongit_repo/packages/app/node_modules/react/index.js" \
+    "$nongit_repo/backend/venv/lib/python3.11/site-packages/demo_pkg/__init__.py" \
+    "$nongit_repo/service/.venv/lib/site-packages/demo_pkg/__init__.py" \
+    "$nongit_repo/frontend/.next/cache/trace.txt" \
+    "$nongit_repo/src/main.py"
+
+  python3 "$ROOT_DIR/kits/codex-bootstrap-kit/templates/.codex_bootstrap/bootstrap/generate_codex_state.py" \
+    --root "$nongit_repo" \
+    --config "$ROOT_DIR/kits/codex-bootstrap-kit/templates/.codex_bootstrap/config.json" >/dev/null
+
+  nongit_tree="$nongit_repo/.local_codex/PROJECT_TREE.txt"
+  assert_file "$nongit_tree"
+  if rg -n '(^|/)(node_modules|venv|\.venv|\.next)(/|$)|site-packages' -S "$nongit_tree" >/dev/null; then
+    fail "non-git tree snapshot included excluded dependency/build directories"
+  fi
+  assert_grep '^\./src/main\.py$' "$nongit_tree" "non-git tree snapshot missed expected source file"
+}
+
 run_surface_smoke_checks() {
   log "Running surface smoke checks (CLI / Codex App / Agent Skills)"
 
@@ -323,6 +389,7 @@ run_surface_smoke_checks() {
   assert_file "$target_repo/.local_codex/SESSION_PRIMER.md"
   assert_grep 'scripts/codex_task\.sh' "$target_repo/.local_codex/SESSION_PRIMER.md" "session primer missing taskflow bootstrap routing"
   assert_grep 'scripts/codex_task_lint\.sh --latest --mode complete' "$target_repo/.local_codex/SESSION_PRIMER.md" "session primer missing taskflow lint routing"
+  assert_grep 'git ls-files --cached --others --exclude-standard' "$target_repo/.local_codex/SESSION_PRIMER.md" "session primer missing tree indexing guardrails"
 
   # Bootstrap output control surface.
   (
@@ -457,6 +524,7 @@ main() {
   run_gitignore_resilience_checks
   run_non_destructive_mode_checks
   run_config_validation_checks
+  run_tree_exclusion_checks
   run_surface_smoke_checks
   run_docs_surface_checks
   log "All checks passed"
