@@ -70,6 +70,46 @@ fi
 [[ -d "$TARGET" ]] || fail "target directory not found: $TARGET"
 TARGET="$(cd "$TARGET" && pwd)"
 
+ensure_path_within_target() {
+  local abs_path="$1"
+  if [[ "$abs_path" != "$TARGET" && "$abs_path" != "$TARGET/"* ]]; then
+    echo "[install] ERROR: resolved path escapes target root: $abs_path" >&2
+    exit 1
+  fi
+}
+
+ensure_no_symlink_components() {
+  local abs_path="$1"
+  local rel_path current part
+
+  ensure_path_within_target "$abs_path"
+  [[ "$abs_path" == "$TARGET" ]] && return
+
+  rel_path="${abs_path#"$TARGET"/}"
+  current="$TARGET"
+  IFS='/' read -r -a parts <<< "$rel_path"
+  for part in "${parts[@]}"; do
+    [[ -n "$part" ]] || continue
+    current="$current/$part"
+    if [[ -L "$current" ]]; then
+      echo "[install] ERROR: refusing to write through symlink path: $current" >&2
+      exit 1
+    fi
+  done
+}
+
+ensure_safe_write_destination() {
+  local dst="$1"
+  local dst_dir
+
+  dst_dir="$(dirname "$dst")"
+  ensure_no_symlink_components "$dst_dir"
+  if [[ -L "$dst" ]]; then
+    echo "[install] ERROR: refusing to overwrite symlink destination: $dst" >&2
+    exit 1
+  fi
+}
+
 backup_file() {
   local rel="$1"
   local src="$2"
@@ -88,6 +128,7 @@ backup_file() {
 
   clean_rel="${rel#./}"
   backup_path="$BACKUP_ROOT/$clean_rel"
+  ensure_safe_write_destination "$backup_path"
   mkdir -p "$(dirname "$backup_path")"
   cp "$src" "$backup_path"
   echo "[install] backup: $clean_rel -> ${backup_path#"$TARGET"/}"
@@ -104,6 +145,8 @@ ensure_gitignore_block() {
   local tmp_file
   local source_file="$gitignore_file"
   local managed_regex='^(\.local_codex/|\.codex_bootstrap/|\.githooks/pre-commit|scripts/codex_bootstrap\.sh|scripts/codex_session\.sh|scripts/codex_verify_session\.sh|scripts/git_pre_commit_sync\.sh|scripts/install_git_hooks\.sh)$'
+
+  ensure_safe_write_destination "$gitignore_file"
 
   if [[ ! -f "$gitignore_file" ]]; then
     if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -172,6 +215,7 @@ copy_file() {
     return
   fi
 
+  ensure_safe_write_destination "$dst"
   mkdir -p "$(dirname "$dst")"
   backup_file "$rel" "$dst"
   cp "$src" "$dst"

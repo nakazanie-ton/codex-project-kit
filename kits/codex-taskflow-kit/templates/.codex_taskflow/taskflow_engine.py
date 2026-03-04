@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,7 @@ def now_utc() -> str:
 
 
 def now_stamp() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
 
 
 def slugify(text: str) -> str:
@@ -144,6 +145,19 @@ def resolve_output_base(root: Path, out_dir_arg: str, out_dir_rel: str) -> Path:
     return root / out_dir_rel
 
 
+def allocate_task_dir(out_base: Path, title: str) -> tuple[str, Path]:
+    base_task_id = f"{now_stamp()}-{slugify(title)}"
+    for attempt in range(10):
+        task_id = base_task_id if attempt == 0 else f"{base_task_id}-{uuid.uuid4().hex[:8]}"
+        task_dir = out_base / task_id
+        try:
+            task_dir.mkdir(parents=True, exist_ok=False)
+            return task_id, task_dir
+        except FileExistsError:
+            continue
+    raise SystemExit("Unable to allocate a unique task directory after 10 attempts")
+
+
 def build_template_data(
     workflow_name: str,
     version: str,
@@ -248,11 +262,8 @@ def main() -> None:
     out_dir_rel = str(config.get("out_dir", "work/taskflow"))
 
     title = resolve_title(args, task_text)
-    task_id = f"{now_stamp()}-{slugify(title)}"
-
     out_base = resolve_output_base(root, args.out_dir, out_dir_rel)
-    task_dir = out_base / task_id
-    task_dir.mkdir(parents=True, exist_ok=True)
+    task_id, task_dir = allocate_task_dir(out_base=out_base, title=title)
 
     steps = config.get("steps", [])
     artifacts = config.get("artifacts", {})

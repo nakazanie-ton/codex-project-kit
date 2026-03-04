@@ -224,6 +224,119 @@ EOF
   assert_grep '"backend_entry":[[:space:]]*"app/main.py"' "$preserve_repo/.codex_bootstrap/config.json" "custom config entry_points was unexpectedly normalized"
 }
 
+run_symlink_safety_checks() {
+  log "Running symlink safety checks"
+
+  local bootstrap_repo taskflow_repo outside_bootstrap outside_taskflow bootstrap_status taskflow_status
+  bootstrap_repo="$(mktemp -d /tmp/codex-bootstrap-symlink-test.XXXXXX)"
+  taskflow_repo="$(mktemp -d /tmp/codex-taskflow-symlink-test.XXXXXX)"
+  outside_bootstrap="$(mktemp /tmp/codex-bootstrap-outside.XXXXXX)"
+  outside_taskflow="$(mktemp /tmp/codex-taskflow-outside.XXXXXX)"
+  TMP_PATHS+=("$bootstrap_repo" "$taskflow_repo" "$outside_bootstrap" "$outside_taskflow")
+
+  git -C "$bootstrap_repo" init -q
+  mkdir -p "$bootstrap_repo/scripts"
+  cat >"$outside_bootstrap" <<'EOF'
+ORIGINAL_BOOTSTRAP
+EOF
+  ln -s "$outside_bootstrap" "$bootstrap_repo/scripts/codex_session.sh"
+
+  set +e
+  bash "$ROOT_DIR/kits/codex-bootstrap-kit/bin/install.sh" --target "$bootstrap_repo" --force >"$bootstrap_repo/install.out" 2>"$bootstrap_repo/install.err"
+  bootstrap_status=$?
+  set -e
+  [[ "$bootstrap_status" -ne 0 ]] || fail "bootstrap installer unexpectedly succeeded with symlink destination"
+  assert_grep "symlink" "$bootstrap_repo/install.err" "bootstrap installer did not report symlink destination"
+  assert_grep "^ORIGINAL_BOOTSTRAP$" "$outside_bootstrap" "bootstrap installer modified file outside target repo"
+
+  git -C "$taskflow_repo" init -q
+  mkdir -p "$taskflow_repo/scripts"
+  cat >"$outside_taskflow" <<'EOF'
+ORIGINAL_TASKFLOW
+EOF
+  ln -s "$outside_taskflow" "$taskflow_repo/scripts/codex_task.sh"
+
+  set +e
+  bash "$ROOT_DIR/kits/codex-taskflow-kit/bin/install.sh" --target "$taskflow_repo" --force >"$taskflow_repo/install.out" 2>"$taskflow_repo/install.err"
+  taskflow_status=$?
+  set -e
+  [[ "$taskflow_status" -ne 0 ]] || fail "taskflow installer unexpectedly succeeded with symlink destination"
+  assert_grep "symlink" "$taskflow_repo/install.err" "taskflow installer did not report symlink destination"
+  assert_grep "^ORIGINAL_TASKFLOW$" "$outside_taskflow" "taskflow installer modified file outside target repo"
+}
+
+run_bootstrap_state_refresh_checks() {
+  log "Running bootstrap state refresh checks"
+
+  local target_repo
+  target_repo="$(mktemp -d /tmp/codex-bootstrap-state-refresh.XXXXXX)"
+  TMP_PATHS+=("$target_repo")
+  git -C "$target_repo" init -q
+
+  bash "$ROOT_DIR/kits/codex-bootstrap-kit/bin/install.sh" --target "$target_repo" >/dev/null
+  cat >"$target_repo/.local_codex/AGENT_STATE.md" <<'EOF'
+# Codex Agent State
+
+## Scope
+- Project: stale-project
+- Root: /tmp/stale-root
+- Context: local Codex development only
+EOF
+
+  (
+    cd "$target_repo"
+    bash scripts/codex_bootstrap.sh >/dev/null
+  )
+
+  python3 - "$target_repo/.local_codex/AGENT_STATE.md" "$target_repo" <<'PY'
+import pathlib
+import sys
+
+agent_state_path = pathlib.Path(sys.argv[1])
+repo_root = pathlib.Path(sys.argv[2]).resolve()
+project_name = repo_root.name
+text = agent_state_path.read_text(encoding="utf-8")
+
+if f"- Project: {project_name}" not in text:
+    raise SystemExit("project line was not refreshed")
+if f"- Root: {repo_root}" not in text:
+    raise SystemExit("root line was not refreshed")
+PY
+}
+
+run_nested_exclude_checks() {
+  log "Running nested exclude checks"
+
+  local target_repo
+  target_repo="$(mktemp -d /tmp/codex-nested-exclude-test.XXXXXX)"
+  TMP_PATHS+=("$target_repo")
+  git -C "$target_repo" init -q
+
+  bash "$ROOT_DIR/kits/codex-bootstrap-kit/bin/install.sh" --target "$target_repo" >/dev/null
+
+  mkdir -p "$target_repo/src/vendor/node_modules/pkg"
+  mkdir -p "$target_repo/src/runtime/.venv/bin"
+  cat >"$target_repo/src/vendor/node_modules/pkg/index.js" <<'EOF'
+console.log("skip");
+EOF
+  cat >"$target_repo/src/runtime/.venv/bin/activate" <<'EOF'
+#!/usr/bin/env bash
+EOF
+  cat >"$target_repo/src/keep.txt" <<'EOF'
+keep
+EOF
+
+  (
+    cd "$target_repo"
+    bash scripts/codex_bootstrap.sh >/dev/null
+  )
+
+  assert_grep '^\.\/src\/keep\.txt$' "$target_repo/.local_codex/PROJECT_TREE.txt" "regular project file missing from tree snapshot"
+  if grep -Eq '\.\/src\/vendor\/node_modules\/|\.\/src\/runtime\/\.venv\/' "$target_repo/.local_codex/PROJECT_TREE.txt"; then
+    fail "tree snapshot unexpectedly contains nested excluded paths"
+  fi
+}
+
 run_config_validation_checks() {
   log "Running config validation checks"
 
@@ -523,6 +636,9 @@ main() {
   run_python_compile_gates
   run_gitignore_resilience_checks
   run_non_destructive_mode_checks
+  run_symlink_safety_checks
+  run_bootstrap_state_refresh_checks
+  run_nested_exclude_checks
   run_config_validation_checks
   run_tree_exclusion_checks
   run_surface_smoke_checks

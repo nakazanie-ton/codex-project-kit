@@ -262,7 +262,6 @@ def load_config(root: Path, config_path: Path) -> BootstrapConfig:
 
 def build_tree_snapshot(root: Path, exclude_paths: set[str]) -> list[str]:
     exclude_exact_paths, exclude_dir_names = build_exclude_matchers(exclude_paths)
-
     git_entries = build_tree_snapshot_from_git(
         root,
         exclude_exact_paths=exclude_exact_paths,
@@ -290,7 +289,11 @@ def build_tree_snapshot(root: Path, exclude_paths: set[str]) -> list[str]:
 
         for file_name in files:
             rel_file = normalize_rel_path(f"{rel_dir}/{file_name}" if rel_dir != "." else file_name)
-            if is_path_excluded(rel_file, exclude_exact_paths=exclude_exact_paths, exclude_dir_names=exclude_dir_names):
+            if is_path_excluded(
+                rel_file,
+                exclude_exact_paths=exclude_exact_paths,
+                exclude_dir_names=exclude_dir_names,
+            ):
                 continue
             add_file_with_parents(entries, rel_file)
 
@@ -347,6 +350,16 @@ def ensure_agent_state(path: Path, project_name: str, root: Path) -> None:
         replaced = (
             content.replace("{{PROJECT_NAME}}", project_name)
             .replace("{{PROJECT_ROOT}}", str(root))
+        )
+        replaced = re.sub(
+            r"(?m)^- Project:\s*.*$",
+            lambda _: f"- Project: {project_name}",
+            replaced,
+        )
+        replaced = re.sub(
+            r"(?m)^- Root:\s*.*$",
+            lambda _: f"- Root: {root}",
+            replaced,
         )
         if replaced != content:
             path.write_text(replaced, encoding="utf-8")
