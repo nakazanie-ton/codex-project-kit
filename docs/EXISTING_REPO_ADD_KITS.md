@@ -40,20 +40,28 @@ Set Local Environment setup script:
 
 ```bash
 set -euo pipefail
-CODEX_BOOTSTRAP_REQUIRED=1 bash scripts/codex_verify_session.sh
+CODEX_BOOTSTRAP_REQUIRED=1 bash scripts/codex_verify_session.sh --quiet
 ```
 
 Recommended App actions:
 
-1. `Verify Context`
+1. `Refresh Context`
 ```bash
-bash scripts/codex_verify_session.sh --skip-bootstrap
+bash scripts/codex_verify_session.sh
 ```
 
-2. `Start Taskflow`
+2. `Check Context`
 ```bash
-bash scripts/codex_task.sh
+bash scripts/codex_verify_session.sh --skip-bootstrap --quiet
 ```
+
+3. `Start Taskflow From Clipboard` (Codex App for Mac)
+```bash
+bash scripts/codex_task_from_clipboard.sh
+```
+
+Avoid wiring `bash scripts/codex_task.sh` directly as a static App action with no task input.
+It now refuses empty requests by default to prevent junk `Untitled Task` scaffolds.
 
 ## 4. AGENTS/Skills Connection
 Add this mandatory startup sequence to `AGENTS.md`:
