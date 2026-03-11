@@ -245,6 +245,11 @@ def main() -> None:
     parser.add_argument("--file", default="", help="Read task description from file")
     parser.add_argument("--out-dir", default="", help="Override output directory")
     parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Allow generating a blank scaffold when no title/text/stdin is provided",
+    )
+    parser.add_argument(
         "--json-path-only",
         action="store_true",
         help="Print only taskflow.json absolute path",
@@ -253,6 +258,10 @@ def main() -> None:
 
     root = Path(args.root).resolve()
     task_text = read_task_text(args)
+    if not args.allow_empty and not args.title.strip() and not task_text:
+        raise SystemExit(
+            "Task input required: pass --text/--file, pipe task text on stdin, or use --allow-empty"
+        )
 
     config_path = root / ".codex_taskflow" / "config.json"
     config = load_config(config_path)

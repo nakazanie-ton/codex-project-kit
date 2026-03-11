@@ -13,11 +13,12 @@ REQUIRE_BOOTSTRAP="$CODEX_TASKFLOW_REQUIRE_BOOTSTRAP"
 usage() {
   cat <<'USAGE'
 Usage:
-  bash scripts/codex_task.sh [--title <title>] [--text <task_text>] [--file <path>] [--out-dir <path>]
+  bash scripts/codex_task.sh [--title <title>] [--text <task_text>] [--file <path>] [--out-dir <path>] [--allow-empty]
 
 Examples:
   bash scripts/codex_task.sh --title "fix auth" --text "login returns 500"
   bash scripts/codex_task.sh --file /tmp/task.txt
+  printf '%s\n' "login returns 500" | bash scripts/codex_task.sh --title "fix auth"
 USAGE
 }
 

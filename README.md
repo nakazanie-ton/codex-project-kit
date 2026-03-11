@@ -93,5 +93,5 @@ Coverage includes:
 - config validation failure checks for bootstrap/taskflow JSON
 - taskflow lint checks (`scaffold` pass, `complete` fail-on-placeholders)
 - CLI applicability (`codex_session.sh`)
-- Codex App applicability (`codex_verify_session.sh`, `codex_task.sh`)
+- Codex App applicability (`codex_verify_session.sh`, `codex_task.sh`, `codex_task_from_clipboard.sh` on macOS)
 - AGENTS/Skills applicability (startup contract and checklist state)

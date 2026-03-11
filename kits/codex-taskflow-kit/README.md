@@ -28,13 +28,23 @@ bash scripts/codex_task.sh --title "fix auth bug" --text "Login returns 500 for 
 ```
 
 `codex_task.sh` runs `scripts/codex_bootstrap.sh` first (if present), requires checklist `status: PASS`, then creates taskflow artifacts.
+It refuses empty requests by default; use `--allow-empty` only when you intentionally want a blank scaffold.
 Strict mode defaults are enabled:
 - `CODEX_TASKFLOW_REQUIRE_BOOTSTRAP=1`
 - `CODEX_BOOTSTRAP_REQUIRED=1`
 
+Codex App for Mac helper:
+
+```bash
+bash scripts/codex_task_from_clipboard.sh
+```
+
+This reads the current clipboard with `pbpaste`, derives the title from the first non-empty line, and creates taskflow artifacts from the copied request.
+
 ## What it installs
 
 - `scripts/codex_task.sh`
+- `scripts/codex_task_from_clipboard.sh`
 - `scripts/codex_task_lint.sh`
 - `.codex_taskflow/config.json`
 - `.codex_taskflow/taskflow_engine.py`

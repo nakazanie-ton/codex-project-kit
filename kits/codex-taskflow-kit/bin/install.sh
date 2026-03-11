@@ -140,7 +140,7 @@ ensure_gitignore_block() {
   local end_marker="# <<< codex-taskflow-kit (local-only)"
   local tmp_file
   local source_file="$gitignore_file"
-  local managed_regex='^(\.codex_taskflow/|scripts/codex_task\.sh|scripts/codex_task_lint\.sh|work/taskflow/)$'
+  local managed_regex='^(\.codex_taskflow/|scripts/codex_task\.sh|scripts/codex_task_from_clipboard\.sh|scripts/codex_task_lint\.sh|work/taskflow/)$'
 
   ensure_safe_write_destination "$gitignore_file"
 
@@ -166,6 +166,7 @@ ensure_gitignore_block() {
     printf "\n%s\n" "$start_marker"
     printf "%s\n" ".codex_taskflow/"
     printf "%s\n" "scripts/codex_task.sh"
+    printf "%s\n" "scripts/codex_task_from_clipboard.sh"
     printf "%s\n" "scripts/codex_task_lint.sh"
     printf "%s\n" "work/taskflow/"
     printf "%s\n" "$end_marker"
@@ -216,6 +217,7 @@ copy_file() {
 
 FILES=(
   "scripts/codex_task.sh"
+  "scripts/codex_task_from_clipboard.sh"
   "scripts/codex_task_lint.sh"
   ".codex_taskflow/config.json"
   ".codex_taskflow/taskflow_engine.py"
@@ -238,6 +240,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 else
   chmod +x \
     "$TARGET/scripts/codex_task.sh" \
+    "$TARGET/scripts/codex_task_from_clipboard.sh" \
     "$TARGET/scripts/codex_task_lint.sh" \
     "$TARGET/.codex_taskflow/taskflow_engine.py"
 fi

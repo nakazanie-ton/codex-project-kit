@@ -90,6 +90,8 @@ Kit auto-update on session start (enabled by default):
   - `.codex_bootstrap/KIT_SOURCE_REPO` marker file (written by `scripts/one_click_install.sh`)
 - `CODEX_KIT_AUTO_UPDATE=1` (default) enables sync each start.
 - Set `CODEX_KIT_AUTO_UPDATE=0` to disable automatic sync.
+- `CODEX_KIT_AUTO_UPDATE_FORCE=0` (default) preserves existing installed files during auto-update.
+- Set `CODEX_KIT_AUTO_UPDATE_FORCE=1` to allow auto-update to overwrite existing kit files.
 
 ## Hook Integration
 

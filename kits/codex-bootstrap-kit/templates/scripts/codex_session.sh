@@ -7,6 +7,7 @@ PRIME_CONTEXT="${CODEX_SESSION_PRIME_CONTEXT:-1}"
 PRIMER_FILE="$ROOT_DIR/.local_codex/SESSION_PRIMER.md"
 KIT_SOURCE_FILE="$ROOT_DIR/.codex_bootstrap/KIT_SOURCE_REPO"
 KIT_AUTO_UPDATE="${CODEX_KIT_AUTO_UPDATE:-1}"
+KIT_AUTO_UPDATE_FORCE="${CODEX_KIT_AUTO_UPDATE_FORCE:-0}"
 export CODEX_BOOTSTRAP_REQUIRED="${CODEX_BOOTSTRAP_REQUIRED:-1}"
 
 is_codex_command() {
@@ -70,6 +71,7 @@ resolve_kit_source_repo() {
 
 sync_from_kit_repo_if_configured() {
   local source_repo updater
+  local updater_args
 
   case "$KIT_AUTO_UPDATE" in
     1) ;;
@@ -77,6 +79,14 @@ sync_from_kit_repo_if_configured() {
     *)
       echo "[session] WARNING: invalid CODEX_KIT_AUTO_UPDATE='$KIT_AUTO_UPDATE' (expected 0|1); skipping auto-update" >&2
       return
+      ;;
+  esac
+
+  case "$KIT_AUTO_UPDATE_FORCE" in
+    0|1) ;;
+    *)
+      echo "[session] WARNING: invalid CODEX_KIT_AUTO_UPDATE_FORCE='$KIT_AUTO_UPDATE_FORCE' (expected 0|1); using safe preserve mode" >&2
+      KIT_AUTO_UPDATE_FORCE=0
       ;;
   esac
 
@@ -90,7 +100,12 @@ sync_from_kit_repo_if_configured() {
     return
   fi
 
-  if ! bash "$updater" --target "$ROOT_DIR" --skip-normalize --skip-verify >/dev/null; then
+  updater_args=(--target "$ROOT_DIR" --skip-normalize --skip-verify)
+  if [[ "$KIT_AUTO_UPDATE_FORCE" != "1" ]]; then
+    updater_args+=(--no-force)
+  fi
+
+  if ! bash "$updater" "${updater_args[@]}" >/dev/null; then
     echo "[session] WARNING: kit auto-update failed from source: $source_repo" >&2
   fi
 }
